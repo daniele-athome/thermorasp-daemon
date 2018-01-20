@@ -20,6 +20,8 @@ class Sensor(Base):
     # Sensor status
     STATUS_UNKNOWN = 0
     STATUS_REGISTERED = 1
+    STATUS_ACTIVE = 2
+    STATUS_INACTIVE = 3
 
     # Contact protocols
     PROTO_LOCAL = 'local'
