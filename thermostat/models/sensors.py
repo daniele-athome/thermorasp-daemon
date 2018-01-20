@@ -12,7 +12,7 @@ class Sensor(Base):
     __tablename__ = 'sensors'
 
     # Sensor data mode
-    # Active: sensors send to server
+    # Active: sensor sends to server
     DATA_MODE_ACTIVE = 0
     # Passive: server polls the sensor
     DATA_MODE_PASSIVE = 1
