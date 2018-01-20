@@ -23,10 +23,6 @@ class Sensor(Base):
     STATUS_ACTIVE = 2
     STATUS_INACTIVE = 3
 
-    # Contact protocols
-    PROTO_LOCAL = 'local'
-    PROTO_INET = 'inet'
-
     # Sensor id. Must be unique so it's the primary key
     id = Column(String(255), primary_key=True)
 

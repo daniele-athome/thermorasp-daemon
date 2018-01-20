@@ -4,3 +4,7 @@
 
 class NotFoundError(Exception):
     pass
+
+
+class NotSupportedError(Exception):
+    pass
