@@ -4,7 +4,7 @@
 from argparse import ArgumentParser
 from multiprocessing import cpu_count
 
-from thermostat import app
+from thermostat import app, database
 
 HOSTS = ('127.0.0.1', '0.0.0.0')
 
@@ -16,4 +16,5 @@ parser.add_argument('--config', type=str, default='/etc/thermostat.conf')
 args = parser.parse_args()
 
 app.config.from_pyfile(args.config)
+app.database = database.init(app.config)
 app.run(host=args.host, port=args.port, workers=args.workers)

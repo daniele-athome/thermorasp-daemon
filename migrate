@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Migration script
+
+# generate: revision --autogenerate
+# upgrade: upgrade head
+# downgrade: downgrade head
+
+PYTHONPATH=. alembic $*

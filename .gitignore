@@ -13,5 +13,6 @@ MANIFEST
 *.iml
 /.idea
 
-# config files
+# local files
 /thermostat.conf
+*.db

@@ -1,0 +1,4 @@
+# Configuration file for Smart Thermostat
+
+# Database URL
+DATABASE_URL="sqlite:////var/lib/thermostat/thermostat.db"
