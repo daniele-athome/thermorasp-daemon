@@ -5,7 +5,7 @@ from sanic.request import Request
 from sanic.response import json
 from sanic.response import html
 
-from thermostat import app, errors
+from .. import app, errors
 
 
 # noinspection PyUnusedLocal

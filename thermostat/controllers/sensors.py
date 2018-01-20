@@ -6,9 +6,9 @@ from sanic.response import json
 
 from sqlalchemy.orm.exc import NoResultFound
 
-from thermostat import app, errors
-from thermostat.database import scoped_session
-from thermostat.models import Sensor
+from .. import app, errors
+from ..database import scoped_session
+from ..models import Sensor
 
 SENSOR_STATUS_MAP = (
     'unknown',
