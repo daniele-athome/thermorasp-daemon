@@ -2,18 +2,18 @@
 # -*- coding: utf-8 -*-
 
 from argparse import ArgumentParser
-from multiprocessing import cpu_count
 
 from thermostat import app, database
 
 HOSTS = ('127.0.0.1', '0.0.0.0')
 
 parser = ArgumentParser(__doc__)
-parser.add_argument('--port', type=int, default=7475)
+parser.add_argument('-p', '--port', type=int, default=7475)
 parser.add_argument('--host', choices=HOSTS, default=HOSTS[0])
-parser.add_argument('--config', type=str, default='/etc/thermostat.conf')
+parser.add_argument('-c', '--config', type=str, default='/etc/thermostat.conf')
+parser.add_argument('-d', '--debug', action='store_true')
 args = parser.parse_args()
 
 app.config.from_pyfile(args.config)
 app.database = database.init(app.config)
-app.run(host=args.host, port=args.port, workers=1)
+app.run(host=args.host, port=args.port, workers=1, debug=args.debug)
