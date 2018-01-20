@@ -12,3 +12,6 @@ MANIFEST
 # IDE
 *.iml
 /.idea
+
+# config files
+/thermostat.conf

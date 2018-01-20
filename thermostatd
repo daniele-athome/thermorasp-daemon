@@ -12,6 +12,8 @@ parser = ArgumentParser(__doc__)
 parser.add_argument('--port', type=int, default=7475)
 parser.add_argument('--host', choices=HOSTS, default=HOSTS[0])
 parser.add_argument('--workers', type=int, default=cpu_count())
+parser.add_argument('--config', type=str, default='/etc/thermostat.conf')
 args = parser.parse_args()
 
+app.config.from_pyfile(args.config)
 app.run(host=args.host, port=args.port, workers=args.workers)
