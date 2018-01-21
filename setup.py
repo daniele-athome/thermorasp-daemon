@@ -18,14 +18,14 @@ scripts = ['thermostatd']
 
 
 setup(
-    name='thermostat_api',
+    name='thermostat_daemon',
     version='0.0.1',
     author='Daniele Ricci',
     author_email='daniele@casaricci.it',
     packages=packages,
-    url='https://github.com/daniele-athome/thermostat-api',
+    url='https://github.com/daniele-athome/thermostat-daemon',
     license='LICENSE.txt',
-    description='HTTP API for Raspberry PI Smart Thermostat',
+    description='HTTP API and backend daemon for Raspberry PI Smart Thermostat',
     long_description=long_description,
     include_package_data=True,
     scripts=scripts,
