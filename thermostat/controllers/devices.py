@@ -34,8 +34,8 @@ async def index(request: Request):
 
     with scoped_session(app.database) as session:
         stmt = Device.__table__.select()
-        sensors = [serialize_device(d) for d in session.execute(stmt)]
-    return json(sensors)
+        devs = [serialize_device(d) for d in session.execute(stmt)]
+    return json(devs)
 
 
 @app.post('/devices/register')
@@ -49,9 +49,9 @@ async def register(request: Request):
         device.protocol = in_data['protocol']
         device.address = in_data['address']
         device.device_type = in_data['type']
-        sensor = session.merge(device)
+        device = session.merge(device)
         devices.register_device(device.id, device.protocol, device.address)
-        return json(serialize_device(sensor))
+        return json(serialize_device(device))
 
 
 @app.post('/devices/unregister')
