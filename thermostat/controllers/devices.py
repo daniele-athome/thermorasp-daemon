@@ -50,6 +50,7 @@ async def register(request: Request):
         device.address = in_data['address']
         device.device_type = in_data['type']
         sensor = session.merge(device)
+        devices.register_device(device.id, device.protocol, device.address)
         return json(serialize_device(sensor))
 
 
@@ -64,6 +65,7 @@ async def unregister(request: Request):
         try:
             device = session.query(Device).filter(Device.id == in_data['id']).one()
             session.delete(device)
+            devices.unregister_device(device.id)
             return json({
                 'id': device.id,
             })

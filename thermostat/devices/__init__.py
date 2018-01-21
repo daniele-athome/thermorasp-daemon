@@ -38,9 +38,21 @@ def init():
     with scoped_session(app.database) as session:
         stmt = Device.__table__.select()
         for d in session.execute(stmt):
-            dev_id = d['id']
-            dev_instance = _get_device_handler(dev_id, d['protocol'], d['address'])
-            device_instances[dev_id] = dev_instance
+            register_device(d['id'], d['protocol'], d['address'])
+
+
+def register_device(device_id, protocol, address):
+    """Creates a new device and stores the instance in the internal collection."""
+    dev_instance = _get_device_handler(device_id, protocol, address)
+    device_instances[device_id] = dev_instance
+
+
+def unregister_device(device_id):
+    """Removes a registered device from the internal collection."""
+    try:
+        del device_instances[device_id]
+    except KeyError:
+        pass
 
 
 def _get_device_handler(device_id: str, protocol: str, address: str) -> BaseDeviceHandler:
