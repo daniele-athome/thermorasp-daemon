@@ -6,7 +6,7 @@ import asyncio
 import datetime
 
 from .database import scoped_session
-from . import app
+from . import app, devices
 from .models import Sensor
 from .models.sensors import store_reading
 from .sensors import get_sensor_handler
@@ -47,4 +47,5 @@ async def backend():
 # noinspection PyUnusedLocal
 @app.listener('before_server_start')
 async def init_backend(sanic, loop):
+    devices.init()
     asyncio.ensure_future(backend(), loop=loop)
