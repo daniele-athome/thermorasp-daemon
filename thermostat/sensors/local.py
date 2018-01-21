@@ -1,18 +1,20 @@
 # -*- coding: utf-8 -*-
 """Protocols for local sensors (e.g. GPIO)."""
 
+import os
 from random import randint
 
 import importlib.util
 try:
     importlib.util.find_spec('RPi.GPIO')
     import RPi.GPIO as GPIO
+    fakeSensors = False
 except ImportError:
     from fake_rpi.RPi import GPIO as GPIO
-    # will skip W1ThermSensor modprobe call
-    import os
-    os.environ['W1THERMSENSOR_NO_KERNEL_MODULE'] = '1'
+    fakeSensors = True
 
+# will skip W1ThermSensor modprobe call
+os.environ['W1THERMSENSOR_NO_KERNEL_MODULE'] = '1'
 from w1thermsensor import W1ThermSensor
 
 from . import BaseSensorHandler
@@ -43,7 +45,7 @@ class GPIOSensorHandler(BaseSensorHandler):
 
     def read(self, sensor_type):
         if sensor_type == 'temperature':
-            if os.environ['W1THERMSENSOR_NO_KERNEL_MODULE'] == '1':
+            if fakeSensors:
                 # random temperature :D
                 temp = 23
             else:
