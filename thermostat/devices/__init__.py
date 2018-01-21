@@ -20,6 +20,7 @@ class BaseDeviceHandler:
 
     def __init__(self, device_id, address):
         self.device_id = device_id
+        self.address = address
 
     def control(self, device_type, *args, **kwargs):
         """Generic control interface. Implementation-dependent."""
