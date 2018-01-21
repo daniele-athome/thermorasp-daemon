@@ -37,8 +37,8 @@ class RandomSensorHandler(BaseSensorHandler):
             raise errors.NotSupportedError('Only temperature is supported')
 
 
-class GPIOSensorHandler(BaseSensorHandler):
-    """Raspberry sensor handler that reads from GPIO."""
+class GPIOW1SensorHandler(BaseSensorHandler):
+    """Raspberry sensor handler that reads from GPIO using 1-Wire protocol."""
 
     def __init__(self, address):
         BaseSensorHandler.__init__(self, address)
@@ -49,7 +49,7 @@ class GPIOSensorHandler(BaseSensorHandler):
                 # random temperature :D
                 temp = 23
             else:
-                sensor = W1ThermSensor()
+                sensor = W1ThermSensor(sensor_id=self.address)
                 temp = sensor.get_temperature(unit=W1ThermSensor.DEGREES_C)
 
             return {
@@ -61,6 +61,6 @@ class GPIOSensorHandler(BaseSensorHandler):
 
 
 schemes = {
-    'GPIO': GPIOSensorHandler,
+    'GPIOW1': GPIOW1SensorHandler,
     'RND': RandomSensorHandler,
 }

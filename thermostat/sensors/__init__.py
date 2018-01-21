@@ -8,7 +8,7 @@ class BaseSensorHandler:
     """Base interface for sensor handlers."""
 
     def __init__(self, address):
-        pass
+        self.address = address
 
     def read(self, sensor_type):
         raise NotImplementedError()
