@@ -11,4 +11,4 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
-from .sensors import Sensor
+from .sensors import Sensor, Reading

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Sensors API."""
 
+import datetime
+
 from sanic.request import Request
 from sanic.response import json
 
@@ -8,7 +10,7 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from .. import app, errors
 from ..database import scoped_session
-from ..models import Sensor
+from ..models.sensors import Sensor, Reading
 
 SENSOR_STATUS_MAP = (
     'unknown',
@@ -34,6 +36,16 @@ def serialize_sensor(sensor):
     }
 
 
+def serialize_sensor_reading(mreading):
+    return {
+        'sensor_id': mreading.sensor_id,
+        'type': mreading.sensor_type,
+        'timestamp': mreading.timestamp.isoformat(),
+        'unit': mreading.unit,
+        'value': mreading.value,
+    }
+
+
 # noinspection PyUnusedLocal
 @app.get('/sensors')
 async def index(request: Request):
@@ -45,7 +57,6 @@ async def index(request: Request):
     return json(sensors)
 
 
-# noinspection PyUnusedLocal
 @app.post('/sensors/register')
 async def register(request: Request):
     """
@@ -65,7 +76,6 @@ async def register(request: Request):
         return json(serialize_sensor(sensor))
 
 
-# noinspection PyUnusedLocal
 @app.post('/sensors/unregister')
 async def unregister(request: Request):
     """
@@ -83,3 +93,22 @@ async def unregister(request: Request):
             })
         except NoResultFound:
             raise errors.NotFoundError('Sensor not found.')
+
+
+@app.post('/sensors/reading')
+async def reading(request: Request):
+    """Adds a sensor reading to the database. Used by sensors to send data."""
+
+    in_data = request.json
+    with scoped_session(app.database) as session:
+        mreading = Reading()
+        mreading.sensor_id = in_data['sensor_id']
+        mreading.sensor_type = in_data['type']
+        mreading.unit = in_data['unit']
+        mreading.value = in_data['value']
+        if 'timestamp' in in_data:
+            mreading.timestamp = in_data['timestamp']
+        else:
+            mreading.timestamp = datetime.datetime.now()
+        session.add(mreading)
+        return json(serialize_sensor_reading(mreading))
