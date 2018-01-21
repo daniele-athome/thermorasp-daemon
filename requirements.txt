@@ -2,3 +2,4 @@ sanic==0.7.0
 SQLAlchemy==1.2.1
 alembic==0.9.7
 fake_rpi==0.6.0
+w1thermsensor==1.0.5
