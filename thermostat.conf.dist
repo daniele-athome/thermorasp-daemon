@@ -1,4 +1,7 @@
 # Configuration file for Smart Thermostat
 
+# Backend loop interval in seconds.
+BACKEND_INTERVAL=60
+
 # Database URL
 DATABASE_URL="sqlite:////var/lib/thermostat/thermostat.db"

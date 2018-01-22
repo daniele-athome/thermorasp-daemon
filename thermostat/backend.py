@@ -53,7 +53,7 @@ async def backend():
             log.error('Unexpected error:', exc_info=sys.exc_info())
             eventlog.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
 
-        await asyncio.sleep(10)
+        await asyncio.sleep(app.config['BACKEND_INTERVAL'])
 
 
 # noinspection PyUnusedLocal
