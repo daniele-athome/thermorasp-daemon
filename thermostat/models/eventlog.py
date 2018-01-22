@@ -51,9 +51,10 @@ def event(level, source, name, description=None):
         vevent.description = description
         session.add(vevent)
 
+
 def event_exc(level, source, name):
     import traceback
     e_type, e_value, e_tb = sys.exc_info()
     strerr1 = traceback.format_exception_only(e_type, e_value)[0][:-1]
     strerr = ''.join(traceback.format_exception(e_type, e_value, e_tb))
-    event(LEVEL_ERROR, 'backend', 'exception', strerr1 + "\n" + strerr)
+    event(level, source, name, strerr1 + "\n" + strerr)
