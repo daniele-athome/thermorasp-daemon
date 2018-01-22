@@ -34,16 +34,21 @@ def read_passive_sensors(sensor_type):
         store_reading(sensor_info['id'], sensor_type, datetime.datetime.now(), reading['unit'], reading['value'])
 
 
+def backend_ops():
+    """All backend cycle operations are here."""
+    # read from passive temperature sensors
+    read_passive_sensors('temperature')
+
+    # TODO handle programs
+
+
 # noinspection PyBroadException
 async def backend():
     while app.is_running:
         log.debug("BACKEND RUNNING")
 
         try:
-            # read from passive temperature sensors
-            read_passive_sensors('temperature')
-
-            # TODO handle programs
+            backend_ops()
         except:
             log.error('Unexpected error:', exc_info=sys.exc_info())
             eventlog.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
