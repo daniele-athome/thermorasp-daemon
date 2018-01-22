@@ -13,3 +13,4 @@ Base = declarative_base()
 
 from .sensors import Sensor, Reading
 from .devices import Device
+from .eventlog import EventLog
