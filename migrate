@@ -5,4 +5,20 @@
 # upgrade: upgrade head
 # downgrade: downgrade head
 
-PYTHONPATH=. alembic $*
+run_alembic() {
+    PYTHONPATH=. alembic $*
+}
+
+case "$1" in
+    generate)
+        run_alembic revision --autogenerate
+        ;;
+    upgrade)
+        run_alembic upgrade head
+        ;;
+    downgrade)
+        run_alembic downgrade head
+        ;;
+    *)
+        run_alembic $*
+esac
