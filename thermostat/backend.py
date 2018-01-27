@@ -5,6 +5,7 @@ import sys
 import logging
 import asyncio
 import datetime
+import sdnotify
 
 from .database import scoped_session
 from . import app, devices
@@ -61,3 +62,10 @@ async def backend():
 async def init_backend(sanic, loop):
     devices.init()
     asyncio.ensure_future(backend(), loop=loop)
+
+
+# noinspection PyUnusedLocal
+@app.listener('after_server_start')
+async def notify_systemd(sanic, loop):
+    n = sdnotify.SystemdNotifier()
+    n.notify("READY=1")
