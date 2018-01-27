@@ -1,0 +1,14 @@
+[Unit]
+Description=Smart Thermostat Daemon
+After=network.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/thermostatd
+Restart=no
+User=pi
+Group=pi
+
+[Install]
+WantedBy=multi-user.target
+Alias=thermostatd.service
