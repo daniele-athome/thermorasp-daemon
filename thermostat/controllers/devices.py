@@ -4,11 +4,7 @@
 from sanic.request import Request
 from sanic.response import json
 
-from sqlalchemy.orm.exc import NoResultFound
-
-from .. import app, errors, devices
-from ..database import scoped_session
-from ..models.devices import Device
+from .. import app, errors
 
 
 DEVICE_STATUS_MAP = (
@@ -22,8 +18,8 @@ def serialize_device(device):
     return {
         'id': device.id,
         'protocol': device.protocol,
-        'address': device.address,
-        'type': device.device_type,
+        'address': ':'.join(device.address),
+        'type': device.type,
     }
 
 
@@ -32,10 +28,7 @@ def serialize_device(device):
 async def index(request: Request):
     """List all registered devices."""
 
-    with scoped_session(app.database) as session:
-        stmt = Device.__table__.select()
-        devs = [serialize_device(d) for d in session.execute(stmt)]
-    return json(devs)
+    return json([serialize_device(d) for d in app.backend.devices.values()])
 
 
 @app.post('/devices/register')
@@ -43,20 +36,8 @@ async def register(request: Request):
     """Request registration for a device."""
 
     in_data = request.json
-    with scoped_session(app.database) as session:
-        # unregister old device if any
-        old_device = session.query(Device).filter(Device.id == in_data['id']).one()
-        if old_device:
-            devices.unregister_device(old_device.id)
-
-        device = Device()
-        device.id = in_data['id']
-        device.protocol = in_data['protocol']
-        device.address = in_data['address']
-        device.device_type = in_data['type']
-        device = session.merge(device)
-        devices.register_device(device.id, device.protocol, device.address)
-        return json(serialize_device(device))
+    app.backend.devices.register(in_data['id'], in_data['protocol'], in_data['address'], in_data['type'])
+    return json({'id': in_data['id']})
 
 
 @app.post('/devices/unregister')
@@ -66,37 +47,28 @@ async def unregister(request: Request):
     """
 
     in_data = request.json
-    with scoped_session(app.database) as session:
-        try:
-            device = session.query(Device).filter(Device.id == in_data['id']).one()
-            session.delete(device)
-            devices.unregister_device(device.id)
-            return json({
-                'id': device.id,
-            })
-        except NoResultFound:
-            raise errors.NotFoundError('Device not found.')
+    if app.backend.devices.unregister(in_data['id']):
+        return json({'id': in_data['id']})
+    else:
+        raise errors.NotFoundError('Device not found.')
 
 
+# noinspection PyUnusedLocal
 @app.get('/devices/status/<device_id>')
 async def status(request: Request, device_id: str):
     """
     Request the status of a device.
     """
 
-    if 'type' in request.args and len(request.args['type']) == 1 and request.args['type'][0]:
-        device_type = request.args['type'][0]
-    else:
-        device_type = None
-
-    instance = devices.get_device(device_id)
-    if instance:
-        return json({
-            'id': instance.device_id,
-            'status': instance.status(device_type),
-        })
-    else:
+    try:
+        instance = app.backend.devices[device_id]
+    except KeyError:
         raise errors.NotFoundError('Device not found.')
+
+    return json({
+        'id': instance.device_id,
+        'status': instance.status(),
+    })
 
 
 @app.post('/devices/control/<device_id>')
@@ -105,17 +77,13 @@ async def control(request: Request, device_id: str):
     Request a control operation for a device.
     """
 
-    if 'type' in request.args and len(request.args['type']) == 1 and request.args['type'][0]:
-        device_type = request.args['type'][0]
-    else:
-        device_type = None
-
-    instance = devices.get_device(device_id)
-    if instance:
-        return json({
-            'id': instance.device_id,
-            'control': instance.control(device_type, **request.json),
-            'status': instance.status(device_type),
-        })
-    else:
+    try:
+        instance = app.backend.devices[device_id]
+    except KeyError:
         raise errors.NotFoundError('Device not found.')
+
+    return json({
+        'id': instance.device_id,
+        'control': instance.control(**request.json),
+        'status': instance.status(),
+    })

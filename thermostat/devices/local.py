@@ -10,7 +10,6 @@ except ImportError:
 
 
 from . import BaseDeviceHandler
-from ..errors import NotSupportedError
 from ..models import eventlog
 
 
@@ -19,8 +18,8 @@ class MemoryOnOffDeviceHandler(BaseDeviceHandler):
 
     SUPPORTED_TYPES = ('boiler_on_off', )
 
-    def __init__(self, device_id, address):
-        BaseDeviceHandler.__init__(self, device_id, address)
+    def __init__(self, device_id, device_type, protocol, address):
+        BaseDeviceHandler.__init__(self, device_id, device_type, protocol, address)
         self.enabled = False
 
     def startup(self):
@@ -29,29 +28,17 @@ class MemoryOnOffDeviceHandler(BaseDeviceHandler):
     def shutdown(self):
         pass
 
-    def control(self, device_type, *args, **kwargs):
-        if device_type not in self.SUPPORTED_TYPES:
-            raise NotSupportedError('Device type not supported.')
-
-        print(kwargs)
+    def control(self, *args, **kwargs):
         if 'enabled' in kwargs and kwargs['enabled']:
             self.enabled = True
         else:
             self.enabled = False
 
-        eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', '%s:%d' % (device_type, self.enabled))
+        eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', 'enabled:%d' % self.enabled)
         return True
 
-    def status(self, device_type, *args, **kwargs):
-        if not device_type:
-            device_type = 'boiler_on_off'
-        elif device_type not in self.SUPPORTED_TYPES:
-            raise NotSupportedError('Device type not supported.')
-
-        if self.enabled:
-            return {device_type: 'ON'}
-        else:
-            return {device_type: 'OFF'}
+    def status(self, *args, **kwargs):
+        return {'enabled': self.enabled}
 
 
 class GPIOSwitchDeviceHandler(BaseDeviceHandler):
@@ -59,9 +46,9 @@ class GPIOSwitchDeviceHandler(BaseDeviceHandler):
 
     SUPPORTED_TYPES = ('boiler_on_off', )
 
-    def __init__(self, device_id, address):
-        BaseDeviceHandler.__init__(self, device_id, address)
-        self.pin = int(address)
+    def __init__(self, device_id, device_type, protocol, address):
+        BaseDeviceHandler.__init__(self, device_id, device_type, protocol, address)
+        self.pin = int(self.address[1])
         self.enabled = False
 
     def set_switch(self, enabled):
@@ -76,25 +63,14 @@ class GPIOSwitchDeviceHandler(BaseDeviceHandler):
     def shutdown(self):
         self.set_switch(False)
 
-    def control(self, device_type, *args, **kwargs):
-        if device_type not in self.SUPPORTED_TYPES:
-            raise NotSupportedError('Device type not supported.')
-
+    def control(self, *args, **kwargs):
         enabled = 'enabled' in kwargs and kwargs['enabled']
         self.set_switch(enabled)
-        eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', '%s:%d' % (device_type, enabled))
+        eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', 'enabled:%d' % enabled)
         return True
 
-    def status(self, device_type, *args, **kwargs):
-        if not device_type:
-            device_type = 'boiler_on_off'
-        elif device_type not in self.SUPPORTED_TYPES:
-            raise NotSupportedError('Device type not supported.')
-
-        if self.enabled:
-            return {device_type: 'ON'}
-        else:
-            return {device_type: 'OFF'}
+    def status(self, *args, **kwargs):
+        return {'enabled': self.enabled}
 
 
 class GPIO2SwitchDeviceHandler(GPIOSwitchDeviceHandler):
@@ -102,8 +78,8 @@ class GPIO2SwitchDeviceHandler(GPIOSwitchDeviceHandler):
 
     SUPPORTED_TYPES = ('boiler_on_off', )
 
-    def __init__(self, device_id, address):
-        GPIOSwitchDeviceHandler.__init__(self, device_id, address)
+    def __init__(self, device_id, device_type, protocol, address):
+        GPIOSwitchDeviceHandler.__init__(self, device_id, device_type, protocol, address)
         # start from a consistent state
         self.set_switch(True)
         self.set_switch(False)

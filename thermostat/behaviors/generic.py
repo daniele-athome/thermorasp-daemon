@@ -37,6 +37,10 @@ class ForceTemperatureBehavior(BaseBehavior):
         }
 
     def execute(self, context):
+        if 'temperature' not in context.last_reading:
+            eventlog.event(eventlog.LEVEL_WARNING, self.id, 'action', 'last reading: (none), unable to proceed')
+            return False
+
         target_device = context.devices[self.target_device_id]
 
         last_reading = context.last_reading['temperature']['_avg']['value']

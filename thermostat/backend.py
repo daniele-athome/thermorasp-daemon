@@ -9,14 +9,14 @@ import sdnotify
 import json
 
 from sqlalchemy import text
+from sqlalchemy.orm.exc import NoResultFound
 
 from .database import scoped_session
 from . import app, devices
-from .models import Sensor, Pipeline, Reading
+from .models import Sensor, Pipeline, Reading, Device
 from .models.sensors import store_reading
 from .models import eventlog
 from .sensors import get_sensor_handler
-from .devices import device_instances
 from .behaviors import BehaviorContext, get_behavior_handler
 
 
@@ -45,11 +45,69 @@ class OperatingPipeline(object):
                 break
 
 
+class DeviceManager(object):
+
+    def __init__(self, database):
+        self.database = database
+        self.devices = {}
+        self._init()
+
+    def __getitem__(self, item):
+        return self.devices[item]
+
+    def values(self):
+        return self.devices.values()
+
+    def _init(self):
+        with scoped_session(app.database) as session:
+            stmt = Device.__table__.select()
+            for d in session.execute(stmt):
+                self._register(d['id'], d['device_type'], d['protocol'], d['address'])
+
+    def _register(self, device_id, device_type, protocol, address):
+        """Creates a new device and stores the instance in the internal collection."""
+        dev_instance = devices.get_device_handler(device_id, device_type, protocol, address)
+        self.devices[device_id] = dev_instance
+        dev_instance.startup()
+
+    def _unregister(self, device_id):
+        self.devices[device_id].shutdown()
+        del self.devices[device_id]
+
+    def register(self, device_id, protocol, address, device_type):
+        with scoped_session(self.database) as session:
+            # unregister old device if any
+            try:
+                old_device = session.query(Device).filter(Device.id == device_id).one()
+                self._unregister(old_device.id)
+            except NoResultFound:
+                pass
+
+            device = Device()
+            device.id = device_id
+            device.protocol = protocol
+            device.address = address
+            device.device_type = device_type
+            device = session.merge(device)
+            self._register(device.id, device.device_type, device.protocol, device.address)
+
+    def unregister(self, device_id):
+        try:
+            self._unregister(device_id)
+            with scoped_session(self.database) as session:
+                device = session.query(Device).filter(Device.id == device_id).one()
+                session.delete(device)
+            return True
+        except (NoResultFound, KeyError):
+            return False
+
+
 class Backend(object):
     """The backend operations thread."""
 
     def __init__(self, myapp):
         self.app = myapp
+        self.devices = DeviceManager(self.app.database)
 
     async def run(self):
         while self.app.is_running:
@@ -94,7 +152,7 @@ class Backend(object):
             # take only the first one
             pipeline = pipelines[0]
             op_pipeline = OperatingPipeline(pipeline)
-            op_pipeline.set_context(device_instances, self.get_last_readings())
+            op_pipeline.set_context(self.devices, self.get_last_readings())
             op_pipeline.run()
 
     def get_last_readings(self, modifier='-10 minutes'):
@@ -166,7 +224,6 @@ class Backend(object):
 # noinspection PyUnusedLocal
 @app.listener('before_server_start')
 async def init_backend(sanic, loop):
-    devices.init()
     app.backend = Backend(app)
     asyncio.ensure_future(app.backend.run(), loop=loop)
     asyncio.ensure_future(app.backend.sensors(), loop=loop)

@@ -3,13 +3,7 @@
 
 import importlib
 
-from .. import app
-from ..database import scoped_session
-from ..models.devices import Device
-
-
-# the singleton device instances are here (device_id: instance)
-device_instances = {}
+from ..errors import NotSupportedError
 
 
 class BaseDeviceHandler(object):
@@ -18,9 +12,13 @@ class BaseDeviceHandler(object):
     # subclasses must define SUPPORTED_TYPES with the list of supported device types
     SUPPORTED_TYPES = ()
 
-    def __init__(self, device_id, address):
-        self.device_id = device_id
-        self.address = address
+    def __init__(self, device_id, device_type, protocol, address):
+        self.id = device_id
+        self.type = device_type
+        self.protocol = protocol
+        self.address = address.split(':', 1)
+        if self.type not in self.SUPPORTED_TYPES:
+            raise NotSupportedError('Device type not supported.')
 
     def startup(self):
         """Called on startup/registration."""
@@ -30,11 +28,11 @@ class BaseDeviceHandler(object):
         """Called on shutdown/unregistration."""
         raise NotImplementedError()
 
-    def control(self, device_type, *args, **kwargs):
+    def control(self, *args, **kwargs):
         """Generic control interface. Implementation-dependent."""
         raise NotImplementedError()
 
-    def status(self, device_type, *args, **kwargs):
+    def status(self, *args, **kwargs):
         """Generic status reading interface. Implementation-dependent."""
         raise NotImplementedError()
 
@@ -42,34 +40,10 @@ class BaseDeviceHandler(object):
         return device_type in self.SUPPORTED_TYPES
 
     def get_name(self):
-        return 'device:' + self.device_id
+        return 'device:' + self.id
 
 
-def init():
-    """Initializes device instances from registered devices storage."""
-    with scoped_session(app.database) as session:
-        stmt = Device.__table__.select()
-        for d in session.execute(stmt):
-            register_device(d['id'], d['protocol'], d['address'])
-
-
-def register_device(device_id, protocol, address):
-    """Creates a new device and stores the instance in the internal collection."""
-    dev_instance = _get_device_handler(device_id, protocol, address)
-    device_instances[device_id] = dev_instance
-    dev_instance.startup()
-
-
-def unregister_device(device_id):
-    """Removes a registered device from the internal collection."""
-    try:
-        device_instances[device_id].shutdown()
-        del device_instances[device_id]
-    except KeyError:
-        pass
-
-
-def _get_device_handler(device_id: str, protocol: str, address: str) -> BaseDeviceHandler:
+def get_device_handler(device_id: str, device_type: str, protocol: str, address: str) -> BaseDeviceHandler:
     """Returns an appropriate device handler for the given protocol and address."""
     module = importlib.import_module('.'+protocol, __name__)
     if module:
@@ -78,9 +52,4 @@ def _get_device_handler(device_id: str, protocol: str, address: str) -> BaseDevi
             scheme_part, address_part = address.split(':', 1)
             if scheme_part in schemes:
                 handler_class = schemes[scheme_part]
-                return handler_class(device_id, address_part)
-
-
-def get_device(device_id: str) -> BaseDeviceHandler:
-    """Returns the device handler for the given device ID."""
-    return device_instances[device_id]
+                return handler_class(device_id, device_type, protocol, address)
