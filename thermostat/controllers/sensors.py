@@ -68,7 +68,7 @@ async def register(request: Request):
         sensor = Sensor()
         sensor.id = in_data['id']
         sensor.sensor_type = in_data['type']
-        sensor.data_mode = in_data['data_mode']
+        sensor.data_mode = SENSOR_DATA_MODE_MAP.index(in_data['data_mode'])
         sensor.protocol = in_data['protocol']
         sensor.address = in_data['address']
         sensor.status = Sensor.STATUS_UNKNOWN
