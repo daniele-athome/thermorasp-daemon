@@ -38,7 +38,7 @@ class ForceTemperatureBehavior(BaseBehavior):
 
         last_reading = context.last_reading['temperature']['_avg']['value']
         enabled = last_reading < self.target_temperature
-        eventlog.event(eventlog.LEVEL_INFO, self.id, 'action', 'last reading: {}, target: {}, enabled: {}'
+        eventlog.event(eventlog.LEVEL_INFO, self.id, 'behavior:action', 'last reading: {}, target: {}, enabled: {}'
                        .format(last_reading, self.target_temperature, enabled))
         target_device.control(enabled=enabled)
 
