@@ -91,8 +91,8 @@ class GPIO2SwitchDeviceHandler(GPIOSwitchDeviceHandler):
         GPIOSwitchDeviceHandler.__init__(self, device_id, address)
 
     def set_switch(self, enabled):
+        GPIO.setmode(GPIO.BCM)
         if enabled:
-            GPIO.setmode(GPIO.BCM)
             GPIO.setup(self.pin, GPIO.OUT)
             GPIO.output(self.pin, False)
         else:
