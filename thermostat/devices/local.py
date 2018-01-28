@@ -89,6 +89,9 @@ class GPIO2SwitchDeviceHandler(GPIOSwitchDeviceHandler):
 
     def __init__(self, device_id, address):
         GPIOSwitchDeviceHandler.__init__(self, device_id, address)
+        # start from a consistent state
+        self.set_switch(True)
+        self.set_switch(False)
 
     def set_switch(self, enabled):
         GPIO.setmode(GPIO.BCM)
