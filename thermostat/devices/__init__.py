@@ -12,7 +12,7 @@ from ..models.devices import Device
 device_instances = {}
 
 
-class BaseDeviceHandler:
+class BaseDeviceHandler(object):
     """Base interface for device handlers."""
 
     # subclasses must define SUPPORTED_TYPES with the list of supported device types
@@ -32,6 +32,9 @@ class BaseDeviceHandler:
 
     def is_supported(self, device_type):
         return device_type in self.SUPPORTED_TYPES
+
+    def get_name(self):
+        return 'device:' + self.device_id
 
 
 def init():

@@ -4,7 +4,7 @@
 import importlib
 
 
-class BaseSensorHandler:
+class BaseSensorHandler(object):
     """Base interface for sensor handlers."""
 
     def __init__(self, address):

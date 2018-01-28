@@ -11,6 +11,7 @@ except ImportError:
 
 from . import BaseDeviceHandler
 from ..errors import NotSupportedError
+from ..models import eventlog
 
 
 class MemoryOnOffDeviceHandler(BaseDeviceHandler):
@@ -31,6 +32,8 @@ class MemoryOnOffDeviceHandler(BaseDeviceHandler):
             self.enabled = True
         else:
             self.enabled = False
+
+        eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', '%s:%d' % (device_type, self.enabled))
         return True
 
     def status(self, device_type, *args, **kwargs):
@@ -68,6 +71,7 @@ class GPIOSwitchDeviceHandler(BaseDeviceHandler):
 
         enabled = 'enabled' in kwargs and kwargs['enabled']
         self.set_switch(enabled)
+        eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', '%s:%d' % (device_type, enabled))
         return True
 
     def status(self, device_type, *args, **kwargs):
