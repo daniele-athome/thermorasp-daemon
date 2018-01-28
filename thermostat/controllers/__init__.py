@@ -31,4 +31,4 @@ async def on_exception(request: Request, exception: Exception):
 
 
 # import other controllers
-from . import sensors, devices
+from . import sensors, devices, pipelines
