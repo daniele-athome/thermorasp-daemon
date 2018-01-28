@@ -63,8 +63,8 @@ class Reading(Base):
         return '<Reading: {}@{}>'.format(self.id, self.timestamp)
 
 
-def store_reading(sensor_id, sensor_type, timestamp, unit, value):
-    with scoped_session(app.database) as session:
+def store_reading(myapp, sensor_id, sensor_type, timestamp, unit, value):
+    with scoped_session(myapp.database) as session:
         reading = Reading()
         reading.sensor_id = sensor_id
         reading.sensor_type = sensor_type

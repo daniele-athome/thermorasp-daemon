@@ -7,8 +7,8 @@ from . import BaseBehavior
 class ForceTemperatureBehavior(BaseBehavior):
     """A behavior to always keep the temperature at a certain level."""
 
-    def __init__(self, behavior_id, behavior_type, config=None):
-        BaseBehavior.__init__(behavior_id, behavior_type, config)
+    def __init__(self, behavior_id, config=None):
+        BaseBehavior.__init__(self, behavior_id, config)
         self.target_device_id = config['target_device_id']
         self.target_device_type = config['target_device_type']
         self.target_temperature = config['target_temperature']
@@ -38,7 +38,7 @@ class ForceTemperatureBehavior(BaseBehavior):
     def execute(self, context):
         target_device = context.devices[self.target_device_id]
 
-        last_reading = context.last_reading['_avg']
+        last_reading = context.last_reading['temperature']['_avg']['value']
         enabled = last_reading < self.target_temperature
         target_device.control(self.target_device_type, {'enabled': enabled})
 
