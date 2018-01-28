@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 """General purpose behaviors."""
 
+import logging
+
 from . import BaseBehavior
+
+# TEST loggers
+log = logging.getLogger("root")
 
 
 class ForceTemperatureBehavior(BaseBehavior):
@@ -40,6 +45,7 @@ class ForceTemperatureBehavior(BaseBehavior):
 
         last_reading = context.last_reading['temperature']['_avg']['value']
         enabled = last_reading < self.target_temperature
+        log.debug('ForceThermostat enabled: {}'.format(enabled))
         target_device.control(self.target_device_type, {'enabled': enabled})
 
         # don't proceed with the chain

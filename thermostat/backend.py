@@ -12,7 +12,7 @@ from sqlalchemy import text
 
 from .database import scoped_session
 from . import app, devices
-from .models import Sensor, Pipeline, Device, Reading
+from .models import Sensor, Pipeline, Reading
 from .models.sensors import store_reading
 from .models import eventlog
 from .sensors import get_sensor_handler
@@ -35,8 +35,8 @@ class OperatingPipeline(object):
             behavior_instance = get_behavior_handler(behavior['id'], behavior['config'])
             self.chain.append(behavior_instance)
 
-    def set_context(self, active_sensors, active_devices, last_reading):
-        self.context = BehaviorContext(active_sensors, active_devices, last_reading)
+    def set_context(self, active_devices, last_reading):
+        self.context = BehaviorContext(active_devices, last_reading)
 
     def run(self):
         for behavior in self.chain:
@@ -100,9 +100,7 @@ class Backend(object):
                 # active pipeline changed!
                 self.pipeline = OperatingPipeline(pipeline)
 
-            _sensors = {s['id']: s for s in self.get_enabled_sensors()}
-            _last = self.get_last_readings()
-            self.pipeline.set_context(_sensors, device_instances, _last)
+            self.pipeline.set_context(device_instances, self.get_last_readings())
             self.pipeline.run()
 
     def get_last_readings(self, modifier='-10 minutes'):

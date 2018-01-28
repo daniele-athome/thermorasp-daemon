@@ -11,17 +11,13 @@ class BehaviorContext(object):
     such as instances of sensors (to get readings) and devices (to control them).
     """
 
-    def __init__(self, sensors, devices, last_reading=None):
+    def __init__(self, devices, last_reading=None):
         """
-
-        :param sensors: a dictionary of all registered sensors related to the active pipeline
-        :type sensors: dict
         :param devices: a dictionary of all registered devices related to the active pipeline
         :type devices: dict
         :param last_reading: a dictionary of the last reading from each sensor type. '_avg' will have an average of all.
         :type last_reading: dict
         """
-        self.sensors = sensors
         self.devices = devices
         self.last_reading = last_reading
 
