@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=notify
-ExecStart=/usr/local/bin/thermostatd
+ExecStart=/usr/local/bin/thermostatd -d --host 0.0.0.0
 Restart=no
 User=pi
 Group=pi
