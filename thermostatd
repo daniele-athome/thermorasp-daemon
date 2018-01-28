@@ -5,13 +5,11 @@ from argparse import ArgumentParser
 
 from thermostat import app, database
 
-HOSTS = ('127.0.0.1', '0.0.0.0')
-
 parser = ArgumentParser(__doc__)
-parser.add_argument('-p', '--port', type=int, default=7475)
-parser.add_argument('--host', choices=HOSTS, default=HOSTS[0])
-parser.add_argument('-c', '--config', type=str, default='/etc/thermostat.conf')
-parser.add_argument('-d', '--debug', action='store_true')
+parser.add_argument('-p', '--port', type=int, default=7475, help='port to listen for API calls')
+parser.add_argument('--host', default='127.0.0.1', help='host to bind for API calls')
+parser.add_argument('-c', '--config', type=str, default='/etc/thermostat.conf', help='path to configuration file')
+parser.add_argument('-d', '--debug', action='store_true', help='enable debug')
 args = parser.parse_args()
 
 app.config.from_pyfile(args.config)
