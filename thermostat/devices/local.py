@@ -82,7 +82,26 @@ class GPIOSwitchDeviceHandler(BaseDeviceHandler):
             return {device_type: 'OFF'}
 
 
+class GPIO2SwitchDeviceHandler(GPIOSwitchDeviceHandler):
+    """Raspberry device handler that goes ON/OFF through a GPIO, completely turning off the pin on disable."""
+
+    SUPPORTED_TYPES = ('boiler_on_off', )
+
+    def __init__(self, device_id, address):
+        GPIOSwitchDeviceHandler.__init__(self, device_id, address)
+
+    def set_switch(self, enabled):
+        if enabled:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(self.pin, GPIO.OUT)
+            GPIO.output(self.pin, False)
+        else:
+            GPIO.cleanup(self.pin)
+        self.enabled = enabled
+
+
 schemes = {
     'GPIOSW': GPIOSwitchDeviceHandler,
+    'GPIO2SW': GPIO2SwitchDeviceHandler,
     'MEMSW': MemoryOnOffDeviceHandler,
 }
