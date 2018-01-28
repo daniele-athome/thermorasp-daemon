@@ -50,7 +50,6 @@ class Backend(object):
 
     def __init__(self, myapp):
         self.app = myapp
-        self.pipeline = None
 
     async def run(self):
         while self.app.is_running:
@@ -87,21 +86,16 @@ class Backend(object):
 
         # read pipelines config
         pipelines = self.get_enabled_pipelines()
-        if len(pipelines) == 0:
-            self.pipeline = None
-        elif len(pipelines) > 0:
+        if len(pipelines) > 0:
             if len(pipelines) > 1:
                 eventlog.event(eventlog.LEVEL_WARNING, 'backend', 'configuration',
                                "Multiple pipelines active. We'll take the first one")
 
             # take only the first one
             pipeline = pipelines[0]
-            if not self.pipeline or self.pipeline.pipeline['id'] != pipeline['id']:
-                # active pipeline changed!
-                self.pipeline = OperatingPipeline(pipeline)
-
-            self.pipeline.set_context(device_instances, self.get_last_readings())
-            self.pipeline.run()
+            op_pipeline = OperatingPipeline(pipeline)
+            op_pipeline.set_context(device_instances, self.get_last_readings())
+            op_pipeline.run()
 
     def get_last_readings(self, modifier='-10 minutes'):
         """Returns a dict with the last readings from all sensors."""
