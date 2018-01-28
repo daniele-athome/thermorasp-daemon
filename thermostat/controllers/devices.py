@@ -44,6 +44,11 @@ async def register(request: Request):
 
     in_data = request.json
     with scoped_session(app.database) as session:
+        # unregister old device if any
+        old_device = session.query(Device).filter(Device.id == in_data['id']).one()
+        if old_device:
+            devices.unregister_device(old_device.id)
+
         device = Device()
         device.id = in_data['id']
         device.protocol = in_data['protocol']

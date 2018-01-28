@@ -22,6 +22,14 @@ class BaseDeviceHandler(object):
         self.device_id = device_id
         self.address = address
 
+    def startup(self):
+        """Called on startup/registration."""
+        raise NotImplementedError()
+
+    def shutdown(self):
+        """Called on shutdown/unregistration."""
+        raise NotImplementedError()
+
     def control(self, device_type, *args, **kwargs):
         """Generic control interface. Implementation-dependent."""
         raise NotImplementedError()
@@ -49,11 +57,13 @@ def register_device(device_id, protocol, address):
     """Creates a new device and stores the instance in the internal collection."""
     dev_instance = _get_device_handler(device_id, protocol, address)
     device_instances[device_id] = dev_instance
+    dev_instance.startup()
 
 
 def unregister_device(device_id):
     """Removes a registered device from the internal collection."""
     try:
+        device_instances[device_id].shutdown()
         del device_instances[device_id]
     except KeyError:
         pass

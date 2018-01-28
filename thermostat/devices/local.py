@@ -23,6 +23,12 @@ class MemoryOnOffDeviceHandler(BaseDeviceHandler):
         BaseDeviceHandler.__init__(self, device_id, address)
         self.enabled = False
 
+    def startup(self):
+        pass
+
+    def shutdown(self):
+        pass
+
     def control(self, device_type, *args, **kwargs):
         if device_type not in self.SUPPORTED_TYPES:
             raise NotSupportedError('Device type not supported.')
@@ -57,13 +63,18 @@ class GPIOSwitchDeviceHandler(BaseDeviceHandler):
         BaseDeviceHandler.__init__(self, device_id, address)
         self.pin = int(address)
         self.enabled = False
-        self.set_switch(False)
 
     def set_switch(self, enabled):
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.pin, GPIO.OUT)
         GPIO.output(self.pin, enabled)
         self.enabled = enabled
+
+    def startup(self):
+        self.set_switch(False)
+
+    def shutdown(self):
+        self.set_switch(False)
 
     def control(self, device_type, *args, **kwargs):
         if device_type not in self.SUPPORTED_TYPES:
