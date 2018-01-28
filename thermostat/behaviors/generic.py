@@ -46,7 +46,7 @@ class ForceTemperatureBehavior(BaseBehavior):
         last_reading = context.last_reading['temperature']['_avg']['value']
         enabled = last_reading < self.target_temperature
         log.debug('ForceThermostat enabled: {}'.format(enabled))
-        target_device.control(self.target_device_type, {'enabled': enabled})
+        target_device.control(self.target_device_type, enabled=enabled)
 
         # don't proceed with the chain
         return False
