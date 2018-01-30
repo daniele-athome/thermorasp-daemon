@@ -73,7 +73,7 @@ async def register(request: Request):
         sensor.address = in_data['address']
         sensor.status = Sensor.STATUS_UNKNOWN
         sensor = session.merge(sensor)
-        return json(serialize_sensor(sensor))
+        return json(serialize_sensor(sensor), 201)
 
 
 @app.post('/sensors/unregister')

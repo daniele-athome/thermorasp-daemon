@@ -4,7 +4,7 @@
 from sqlalchemy import (
     Column, String, Integer, Boolean, ForeignKey
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 
 from . import Base
 
@@ -20,7 +20,7 @@ class Pipeline(Base):
     description = Column(String(255), nullable=True)
     enabled = Column(Boolean(), default=False)
 
-    behaviors = relationship("Behavior")
+    behaviors = relationship("Behavior", cascade="all, delete-orphan")
 
     # Methods
     def __repr__(self):
@@ -36,3 +36,5 @@ class Behavior(Base):
     behavior_id = Column(String(50), primary_key=True)
 
     config = Column(String(500), default='{}')
+
+    pipeline = relationship("Pipeline", backref=backref("behavior", cascade="all, delete-orphan"))

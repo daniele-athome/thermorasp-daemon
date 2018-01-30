@@ -2,8 +2,7 @@
 """Views and routes of the API."""
 
 from sanic.request import Request
-from sanic.response import json
-from sanic.response import html
+from sanic.response import json, html, HTTPResponse
 
 from .. import app, errors
 
@@ -28,6 +27,10 @@ async def on_exception(request: Request, exception: errors.NotFoundError):
 async def on_exception(request: Request, exception: Exception):
     error = {'error': exception.__class__.__name__, 'message': str(exception)}
     return json(error, getattr(exception, 'status_code', 500))
+
+
+def no_content(status=204, headers=None):
+    return HTTPResponse(status=status, headers=headers)
 
 
 # import other controllers
