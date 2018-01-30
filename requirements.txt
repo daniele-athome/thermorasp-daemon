@@ -2,5 +2,4 @@ sanic==0.7.0
 SQLAlchemy==1.2.1
 alembic==0.9.7
 w1thermsensor==1.0.5
-RPi.GPIO==0.6.3
 sdnotify==0.3.2
