@@ -7,6 +7,7 @@ from sanic.request import Request
 from sanic.response import json
 
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.sql.expression import desc
 
 from .. import app, errors
 from ..database import scoped_session
@@ -93,6 +94,17 @@ async def unregister(request: Request):
             })
         except NoResultFound:
             raise errors.NotFoundError('Sensor not found.')
+
+
+# noinspection PyUnusedLocal
+@app.get('/sensors/reading/<sensor_id>')
+async def reading(request: Request, sensor_id: str):
+    """Reads the latest sensor reading from the database."""
+
+    with scoped_session(app.database) as session:
+        latest = session.query(Reading).filter(Reading.sensor_id == sensor_id)\
+            .order_by(desc(Reading.timestamp)).limit(1).one()
+        return json(serialize_sensor_reading(latest))
 
 
 @app.post('/sensors/reading')
