@@ -66,7 +66,7 @@ async def status(request: Request, device_id: str):
         raise errors.NotFoundError('Device not found.')
 
     return json({
-        'id': instance.device_id,
+        'id': instance.id,
         'status': instance.status(),
     })
 
@@ -83,7 +83,7 @@ async def control(request: Request, device_id: str):
         raise errors.NotFoundError('Device not found.')
 
     return json({
-        'id': instance.device_id,
+        'id': instance.id,
         'control': instance.control(**request.json),
         'status': instance.status(),
     })
