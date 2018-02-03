@@ -18,7 +18,7 @@ class Pipeline(Base):
     # Pipeline information
     name = Column(String(100))
     description = Column(String(255), nullable=True)
-    enabled = Column(Boolean(), default=False, server_default=False)
+    enabled = Column(Boolean(), default=False, server_default='0')
 
     behaviors = relationship("Behavior", cascade="all, delete-orphan", order_by="Behavior.behavior_order")
 
@@ -33,7 +33,7 @@ class Behavior(Base):
 
     # primary key
     pipeline_id = Column(Integer(), ForeignKey('pipelines.id'), primary_key=True)
-    behavior_order = Column(SmallInteger(), primary_key=True, default=1, server_default=1)
+    behavior_order = Column(SmallInteger(), primary_key=True, default=1, server_default='1')
 
     behavior_id = Column(String(50))
 
