@@ -18,8 +18,8 @@ class MemoryOnOffDeviceHandler(BaseDeviceHandler):
 
     SUPPORTED_TYPES = ('boiler_on_off', )
 
-    def __init__(self, device_id, device_type, protocol, address):
-        BaseDeviceHandler.__init__(self, device_id, device_type, protocol, address)
+    def __init__(self, device_id, device_type, protocol, address, name):
+        BaseDeviceHandler.__init__(self, device_id, device_type, protocol, address, name)
         self.enabled = False
 
     def startup(self):
@@ -46,8 +46,8 @@ class GPIOSwitchDeviceHandler(BaseDeviceHandler):
 
     SUPPORTED_TYPES = ('boiler_on_off', )
 
-    def __init__(self, device_id, device_type, protocol, address):
-        BaseDeviceHandler.__init__(self, device_id, device_type, protocol, address)
+    def __init__(self, device_id, device_type, protocol, address, name):
+        BaseDeviceHandler.__init__(self, device_id, device_type, protocol, address, name)
         self.pin = int(self.address[1])
         self.enabled = False
 
@@ -78,8 +78,8 @@ class GPIO2SwitchDeviceHandler(GPIOSwitchDeviceHandler):
 
     SUPPORTED_TYPES = ('boiler_on_off', )
 
-    def __init__(self, device_id, device_type, protocol, address):
-        GPIOSwitchDeviceHandler.__init__(self, device_id, device_type, protocol, address)
+    def __init__(self, device_id, device_type, protocol, address, name):
+        GPIOSwitchDeviceHandler.__init__(self, device_id, device_type, protocol, address, name)
         # start from a consistent state
         self.set_switch(True)
         self.set_switch(False)

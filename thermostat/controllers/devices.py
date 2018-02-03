@@ -17,6 +17,7 @@ DEVICE_STATUS_MAP = (
 def serialize_device(device):
     return {
         'id': device.id,
+        'name': device.name,
         'protocol': device.protocol,
         'address': ':'.join(device.address),
         'type': device.type,
@@ -28,7 +29,8 @@ def serialize_device(device):
 async def index(request: Request):
     """List all registered devices."""
 
-    return json([serialize_device(d) for d in app.backend.devices.values()])
+    device_type = request.args['type'][0] if 'type' in request.args else None
+    return json([serialize_device(d) for d in app.backend.devices.values() if not device_type or device_type == d.type])
 
 
 @app.post('/devices/register')
@@ -36,7 +38,7 @@ async def register(request: Request):
     """Request registration for a device."""
 
     in_data = request.json
-    app.backend.devices.register(in_data['id'], in_data['protocol'], in_data['address'], in_data['type'])
+    app.backend.devices.register(in_data['id'], in_data['protocol'], in_data['address'], in_data['type'], in_data['name'])
     return json({'id': in_data['id']})
 
 

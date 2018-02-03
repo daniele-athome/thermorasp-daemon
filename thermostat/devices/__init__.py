@@ -12,13 +12,15 @@ class BaseDeviceHandler(object):
     # subclasses must define SUPPORTED_TYPES with the list of supported device types
     SUPPORTED_TYPES = ()
 
-    def __init__(self, device_id, device_type, protocol, address):
+    def __init__(self, device_id, device_type, protocol, address, name):
+        if device_type not in self.SUPPORTED_TYPES:
+            raise NotSupportedError('Device type not supported.')
+
         self.id = device_id
         self.type = device_type
         self.protocol = protocol
         self.address = address.split(':', 1)
-        if self.type not in self.SUPPORTED_TYPES:
-            raise NotSupportedError('Device type not supported.')
+        self.name = name
 
     def startup(self):
         """Called on startup/registration."""
@@ -43,7 +45,7 @@ class BaseDeviceHandler(object):
         return 'device:' + self.id
 
 
-def get_device_handler(device_id: str, device_type: str, protocol: str, address: str) -> BaseDeviceHandler:
+def get_device_handler(device_id: str, device_type: str, protocol: str, address: str, name: str) -> BaseDeviceHandler:
     """Returns an appropriate device handler for the given protocol and address."""
     module = importlib.import_module('.'+protocol, __name__)
     if module:
@@ -52,4 +54,4 @@ def get_device_handler(device_id: str, device_type: str, protocol: str, address:
             scheme_part, address_part = address.split(':', 1)
             if scheme_part in schemes:
                 handler_class = schemes[scheme_part]
-                return handler_class(device_id, device_type, protocol, address)
+                return handler_class(device_id, device_type, protocol, address, name)

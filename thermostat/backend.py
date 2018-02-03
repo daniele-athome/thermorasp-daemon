@@ -62,11 +62,11 @@ class DeviceManager(object):
         with scoped_session(app.database) as session:
             stmt = Device.__table__.select()
             for d in session.execute(stmt):
-                self._register(d['id'], d['device_type'], d['protocol'], d['address'])
+                self._register(d['id'], d['device_type'], d['protocol'], d['address'], d['name'])
 
-    def _register(self, device_id, device_type, protocol, address):
+    def _register(self, device_id, device_type, protocol, address, name):
         """Creates a new device and stores the instance in the internal collection."""
-        dev_instance = devices.get_device_handler(device_id, device_type, protocol, address)
+        dev_instance = devices.get_device_handler(device_id, device_type, protocol, address, name)
         self.devices[device_id] = dev_instance
         dev_instance.startup()
 
@@ -74,7 +74,7 @@ class DeviceManager(object):
         self.devices[device_id].shutdown()
         del self.devices[device_id]
 
-    def register(self, device_id, protocol, address, device_type):
+    def register(self, device_id, protocol, address, device_type, name):
         with scoped_session(self.database) as session:
             # unregister old device if any
             try:
@@ -85,11 +85,12 @@ class DeviceManager(object):
 
             device = Device()
             device.id = device_id
+            device.name = name
             device.protocol = protocol
             device.address = address
             device.device_type = device_type
             device = session.merge(device)
-            self._register(device.id, device.device_type, device.protocol, device.address)
+            self._register(device.id, device.device_type, device.protocol, device.address, device.name)
 
     def unregister(self, device_id):
         try:

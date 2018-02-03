@@ -12,7 +12,8 @@ class Device(Base):
     __tablename__ = 'devices'
 
     # Device id. Must be unique so it's the primary key
-    id = Column(String(255), primary_key=True)
+    id = Column(String(100), primary_key=True)
+    name = Column(String(255))
 
     # Device contact information
     protocol = Column(String(20), default='local')
