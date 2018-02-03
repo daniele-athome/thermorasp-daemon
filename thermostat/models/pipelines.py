@@ -2,7 +2,7 @@
 """Models for behavior pipelines."""
 
 from sqlalchemy import (
-    Column, String, Integer, Boolean, ForeignKey
+    Column, String, Integer, SmallInteger, Boolean, ForeignKey
 )
 from sqlalchemy.orm import relationship, backref
 
@@ -20,7 +20,7 @@ class Pipeline(Base):
     description = Column(String(255), nullable=True)
     enabled = Column(Boolean(), default=False)
 
-    behaviors = relationship("Behavior", cascade="all, delete-orphan")
+    behaviors = relationship("Behavior", cascade="all, delete-orphan", order_by="Behavior.behavior_order")
 
     # Methods
     def __repr__(self):
@@ -33,7 +33,9 @@ class Behavior(Base):
 
     # primary key
     pipeline_id = Column(Integer(), ForeignKey('pipelines.id'), primary_key=True)
-    behavior_id = Column(String(50), primary_key=True)
+    behavior_order = Column(SmallInteger(), primary_key=True, default=1)
+
+    behavior_id = Column(String(50))
 
     config = Column(String(500), default='{}')
 

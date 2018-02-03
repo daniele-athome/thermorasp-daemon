@@ -20,6 +20,8 @@ class BehaviorContext(object):
         """
         self.devices = devices
         self.last_reading = last_reading
+        # this will be passed among all behaviors in the chain
+        self.params = []
 
 
 class BaseBehavior(object):
@@ -30,6 +32,7 @@ class BaseBehavior(object):
         self.config = config
         if not self.config:
             self.config = {}
+        # TODO check config based on schema
 
     def get_config_schema(self):
         """Returns the configuration schema for this behavior."""

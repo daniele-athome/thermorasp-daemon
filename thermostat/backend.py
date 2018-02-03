@@ -39,9 +39,9 @@ class OperatingPipeline(object):
         self.context = BehaviorContext(active_devices, last_reading)
 
     def run(self):
-        for behavior in self.chain:
+        for behavior in list(self.chain):
             ret = behavior.execute(self.context)
-            if ret:
+            if not ret:
                 break
 
 
@@ -193,7 +193,10 @@ class Backend(object):
     def get_enabled_pipelines(self):
         with scoped_session(self.app.database) as session:
             ppls = []
-            for p in session.query(Pipeline).filter(Pipeline.enabled == 1).all():
+            for p in session.query(Pipeline) \
+                    .filter(Pipeline.enabled == 1) \
+                    .order_by(Pipeline.id) \
+                    .all():
                 model = {
                     'id': p.id,
                     'name': p.name,
