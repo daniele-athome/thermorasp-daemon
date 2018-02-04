@@ -192,6 +192,7 @@ class Backend(object):
             else:
                 pipeline = self.get_pipeline(pipeline_id)
                 if pipeline:
+                    log.debug("Activating pipeline #{} - {}".format(pipeline['id'], pipeline['name']))
                     self.pipeline = OperatingPipeline(pipeline)
                     self.pipeline.set_context(self.devices, self.get_last_readings())
                     self.pipeline.run()

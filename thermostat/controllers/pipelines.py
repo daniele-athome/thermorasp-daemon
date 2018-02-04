@@ -175,8 +175,6 @@ async def update(request: Request, pipeline_id: int):
                     beh.config = json_dumps(data_behavior['config'])
                     pip.behaviors.append(beh)
             session.add(pip)
-
-            return no_content()
         except NoResultFound:
             raise errors.NotFoundError('Pipeline not found.')
 
@@ -185,3 +183,5 @@ async def update(request: Request, pipeline_id: int):
         await app.backend.set_operating_pipeline(pipeline_id)
     elif app.backend.pipeline and app.backend.pipeline.id == pipeline_id:
         await app.backend.set_operating_pipeline(None)
+
+    return no_content()
