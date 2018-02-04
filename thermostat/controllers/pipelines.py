@@ -171,6 +171,7 @@ async def update(request: Request, pipeline_id: int):
                 for data_behavior in data['behaviors']:
                     beh = Behavior()
                     beh.behavior_id = data_behavior['id']
+                    beh.behavior_order = data_behavior['order']
                     beh.config = json_dumps(data_behavior['config'])
                     pip.behaviors.append(beh)
             session.add(pip)
