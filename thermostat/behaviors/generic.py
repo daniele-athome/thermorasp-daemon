@@ -72,8 +72,9 @@ class ForceTemperatureBehavior(BaseBehavior):
 def thermostat_control(log_source, context, device_id, target_temperature, cooling=True):
     """A simple thermostat function to decide wether to activate a device or not."""
 
-    # immediately set the target temperature to show
+    # immediately set the target temperature and device to show
     context.params['target_temperature'] = target_temperature
+    context.params['target_device'] = device_id
 
     if 'temperature' not in context.last_reading:
         eventlog.event(eventlog.LEVEL_WARNING, log_source, 'action', 'last reading: (none), unable to proceed')

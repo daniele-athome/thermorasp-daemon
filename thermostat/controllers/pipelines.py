@@ -64,7 +64,10 @@ async def active(request: Request):
     if app.backend.pipeline is None:
         raise errors.NotFoundError('Pipeline not found.')
 
-    return json(app.backend.pipeline.pipeline)
+    pipeline = dict(app.backend.pipeline.pipeline)
+    pipeline['params'] = app.backend.pipeline.context.params
+
+    return json(pipeline)
 
 
 # noinspection PyUnusedLocal
@@ -80,19 +83,6 @@ async def update_active(request: Request):
         await app.backend.update_operating_pipeline(data['behaviors'])
 
     return no_content()
-
-
-# noinspection PyUnusedLocal
-@app.get('/pipelines/active/target_temperature')
-async def active(request: Request):
-    """Get the active pipeline current target temperature."""
-
-    if app.backend.pipeline is None:
-        raise errors.NotFoundError('Pipeline not found.')
-    return json({
-        'pipeline_id': app.backend.pipeline.id,
-        'target_temperature': app.backend.pipeline.get_target_temperature(),
-    })
 
 
 # noinspection PyUnusedLocal
