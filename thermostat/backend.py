@@ -35,8 +35,19 @@ class OperatingPipeline(object):
             behavior_instance = get_behavior_handler(behavior['id'], behavior['config'])
             self.chain.append(behavior_instance)
 
+    def __getattr__(self, item):
+        if item in self.pipeline:
+            return self.pipeline[item]
+        else:
+            return object.__getattribute__(self, item)
+
     def set_context(self, active_devices, last_reading):
         self.context = BehaviorContext(active_devices, last_reading)
+
+    def get_target_temperature(self):
+        """Returns the target temperature set during the last run."""
+        return self.context.params['target_temperature'] \
+            if 'target_temperature' in self.context.params else None
 
     def run(self):
         for behavior in list(self.chain):
@@ -109,13 +120,16 @@ class Backend(object):
     def __init__(self, myapp):
         self.app = myapp
         self.devices = DeviceManager(self.app.database)
+        # the operating (active) pipeline
+        self.pipeline = None
+        self.pipeline_lock = asyncio.Lock()
 
     async def run(self):
         while self.app.is_running:
             log.debug("BACKEND RUNNING")
 
             try:
-                self.backend_ops()
+                await self.backend_ops()
             except:
                 log.error('Unexpected error:', exc_info=sys.exc_info())
                 eventlog.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
@@ -140,21 +154,37 @@ class Backend(object):
         # read temperatures
         self.read_passive_sensors('temperature')
 
-    def backend_ops(self):
+    async def backend_ops(self):
         """All backend cycle operations are here."""
 
-        # read pipelines config
-        pipelines = self.get_enabled_pipelines()
-        if len(pipelines) > 0:
-            if len(pipelines) > 1:
-                eventlog.event(eventlog.LEVEL_WARNING, 'backend', 'configuration',
-                               "Multiple pipelines active. We'll take the first one")
+        with await self.pipeline_lock:
+            if self.pipeline is None:
+                # read pipelines config (first run)
+                pipelines = self.get_enabled_pipelines()
+                if len(pipelines) > 0:
+                    if len(pipelines) > 1:
+                        eventlog.event(eventlog.LEVEL_WARNING, 'backend', 'configuration',
+                                       "Multiple pipelines active. We'll take the first one")
 
-            # take only the first one
-            pipeline = pipelines[0]
-            op_pipeline = OperatingPipeline(pipeline)
-            op_pipeline.set_context(self.devices, self.get_last_readings())
-            op_pipeline.run()
+                    # take only the first one
+                    pipeline = pipelines[0]
+                    log.debug("Activating pipeline #{} - {}".format(pipeline['id'], pipeline['name']))
+                    self.pipeline = OperatingPipeline(pipeline)
+
+            self.pipeline.set_context(self.devices, self.get_last_readings())
+            self.pipeline.run()
+
+    async def set_operating_pipeline(self, pipeline_id):
+        with await self.pipeline_lock:
+            if pipeline_id is None:
+                self.pipeline = None
+            else:
+                pipeline = self.get_pipeline(pipeline_id)
+                if pipeline:
+                    self.pipeline = OperatingPipeline(pipeline)
+                    # run immediately
+                    self.pipeline.set_context(self.devices, self.get_last_readings())
+                    self.pipeline.run()
 
     def get_last_readings(self, modifier='-10 minutes'):
         """Returns a dict with the last readings from all sensors."""
@@ -192,22 +222,29 @@ class Backend(object):
 
     def get_enabled_pipelines(self):
         with scoped_session(self.app.database) as session:
-            ppls = []
-            for p in session.query(Pipeline) \
-                    .filter(Pipeline.enabled == 1) \
-                    .order_by(Pipeline.id) \
-                    .all():
-                model = {
-                    'id': p.id,
-                    'name': p.name,
-                    'description': p.description,
-                    'behaviors': [{
-                        'id': b.behavior_id,
-                        'config': json.loads(b.config),
-                    } for b in p.behaviors]
-                }
-                ppls.append(model)
-            return ppls
+            return [self._pipeline_model(p) for p in session.query(Pipeline)
+                    .filter(Pipeline.enabled == 1)
+                    .order_by(Pipeline.id)
+                    .all()]
+
+    def get_pipeline(self, pipeline_id):
+        with scoped_session(self.app.database) as session:
+            return self._pipeline_model(session.query(Pipeline)
+                                        .filter(Pipeline.id == pipeline_id)
+                                        .one())
+
+    @staticmethod
+    def _pipeline_model(p):
+        return {
+            'id': p.id,
+            'name': p.name,
+            'description': p.description,
+            'behaviors': [{
+                'id': b.behavior_id,
+                'order': b.behavior_order,
+                'config': json.loads(b.config),
+            } for b in p.behaviors]
+        }
 
     def get_enabled_sensors(self):
         with scoped_session(self.app.database) as session:

@@ -18,6 +18,7 @@ from ..models import Pipeline, Behavior
 def serialize_pipeline_behavior(b: Behavior):
     return {
         'id': b.behavior_id,
+        'order': b.behavior_order,
         'config': json_loads(b.config),
     }
 
@@ -60,12 +61,23 @@ async def get(request: Request, pipeline_id: int):
 async def active(request: Request):
     """Get the active pipeline."""
 
-    with scoped_session(app.database) as session:
-        try:
-            pipeline = serialize_pipeline(session.query(Pipeline).filter(Pipeline.enabled > 0).one())
-            return json(pipeline)
-        except NoResultFound:
-            raise errors.NotFoundError('Pipeline not found.')
+    if app.backend.pipeline is None:
+        raise errors.NotFoundError('Pipeline not found.')
+
+    return json(app.backend.pipeline.pipeline)
+
+
+# noinspection PyUnusedLocal
+@app.get('/pipelines/active/target_temperature')
+async def active(request: Request):
+    """Get the active pipeline current target temperature."""
+
+    if app.backend.pipeline is None:
+        raise errors.NotFoundError('Pipeline not found.')
+    return json({
+        'pipeline_id': app.backend.pipeline.id,
+        'target_temperature': app.backend.pipeline.get_target_temperature(),
+    })
 
 
 # noinspection PyUnusedLocal
@@ -74,6 +86,8 @@ async def create(request: Request):
     """Creates a pipeline."""
 
     data = request.json
+    new_id = None
+    new_enabled = False
     with scoped_session(app.database) as session:
         pip = Pipeline()
         pip.name = data['name']
@@ -91,13 +105,24 @@ async def create(request: Request):
                 pip.behaviors.append(beh)
         session.add(pip)
         session.flush()
-        return json({'id': pip.id}, 201)
+        new_enabled = pip.enabled
+        new_id = pip.id
+
+    # enable immediately if requested
+    if new_enabled:
+        await app.backend.set_operating_pipeline(new_id)
+
+    return json({'id': new_id}, 201)
 
 
 # noinspection PyUnusedLocal
 @app.delete('/pipelines/<pipeline_id:int>')
 async def delete(request: Request, pipeline_id: int):
     """Deletes a pipeline."""
+
+    if app.backend.pipeline is not None and app.backend.pipeline.id == pipeline_id:
+        # deactivate if active
+        await app.backend.set_operating_pipeline(None)
 
     with scoped_session(app.database) as session:
         try:
@@ -113,6 +138,7 @@ async def update(request: Request, pipeline_id: int):
     """Updates a pipeline."""
 
     data = request.json
+    new_enabled = False
     with scoped_session(app.database) as session:
         try:
             pip = session.query(Pipeline).filter(Pipeline.id == pipeline_id).one()
@@ -123,6 +149,11 @@ async def update(request: Request, pipeline_id: int):
                 pip.description = data['description']
             if 'enabled' in data:
                 pip.enabled = data['enabled']
+                if pip.enabled:
+                    new_enabled = True
+                    # deactivate all other pipelines
+                    session.query(Pipeline).filter(Pipeline.id != pipeline_id).update({'enabled': False})
+
             if 'behaviors' in data:
                 # delete all behaviors first
                 session.query(Behavior).filter(Behavior.pipeline_id == pipeline_id).delete()
@@ -138,3 +169,7 @@ async def update(request: Request, pipeline_id: int):
             return no_content()
         except NoResultFound:
             raise errors.NotFoundError('Pipeline not found.')
+
+    # enable immediately if requested
+    if new_enabled:
+        await app.backend.set_operating_pipeline(pipeline_id)

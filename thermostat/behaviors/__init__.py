@@ -21,7 +21,7 @@ class BehaviorContext(object):
         self.devices = devices
         self.last_reading = last_reading
         # this will be passed among all behaviors in the chain
-        self.params = []
+        self.params = {}
 
 
 class BaseBehavior(object):
