@@ -68,6 +68,21 @@ async def active(request: Request):
 
 
 # noinspection PyUnusedLocal
+@app.put('/pipelines/active')
+async def update_active(request: Request):
+    """Alter the active pipeline without persisting anything to the database."""
+
+    if app.backend.pipeline is None:
+        raise errors.NotFoundError('Pipeline not found.')
+
+    data = request.json
+    if 'behaviors' in data:
+        await app.backend.update_operating_pipeline(data['behaviors'])
+
+    return no_content()
+
+
+# noinspection PyUnusedLocal
 @app.get('/pipelines/active/target_temperature')
 async def active(request: Request):
     """Get the active pipeline current target temperature."""
@@ -142,6 +157,8 @@ async def update(request: Request, pipeline_id: int):
     with scoped_session(app.database) as session:
         try:
             pip = session.query(Pipeline).filter(Pipeline.id == pipeline_id).one()
+            if app.backend.pipeline and app.backend.pipeline.id == pipeline_id:
+                new_enabled = pip.enabled
 
             if 'name' in data:
                 pip.name = data['name']
@@ -153,6 +170,8 @@ async def update(request: Request, pipeline_id: int):
                     new_enabled = True
                     # deactivate all other pipelines
                     session.query(Pipeline).filter(Pipeline.id != pipeline_id).update({'enabled': False})
+                else:
+                    new_enabled = False
 
             if 'behaviors' in data:
                 # delete all behaviors first
@@ -173,3 +192,5 @@ async def update(request: Request, pipeline_id: int):
     # enable immediately if requested
     if new_enabled:
         await app.backend.set_operating_pipeline(pipeline_id)
+    elif app.backend.pipeline and app.backend.pipeline.id == pipeline_id:
+        await app.backend.set_operating_pipeline(None)

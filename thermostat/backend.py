@@ -31,15 +31,23 @@ class OperatingPipeline(object):
         self.pipeline = pipeline
         self.context = None
         self.chain = []
-        for behavior in self.pipeline['behaviors']:
-            behavior_instance = get_behavior_handler(behavior['id'], behavior['config'])
-            self.chain.append(behavior_instance)
+        self._reload_chain()
 
     def __getattr__(self, item):
         if item in self.pipeline:
             return self.pipeline[item]
         else:
             return object.__getattribute__(self, item)
+
+    def update(self, behaviors):
+        self.pipeline['behaviors'] = behaviors
+        self.chain.clear()
+        self._reload_chain()
+
+    def _reload_chain(self):
+        for behavior in self.pipeline['behaviors']:
+            behavior_instance = get_behavior_handler(behavior['id'], behavior['config'])
+            self.chain.append(behavior_instance)
 
     def set_context(self, active_devices, last_reading):
         self.context = BehaviorContext(active_devices, last_reading)
@@ -174,6 +182,12 @@ class Backend(object):
             self.pipeline.set_context(self.devices, self.get_last_readings())
             self.pipeline.run()
 
+    async def update_operating_pipeline(self, behaviors):
+        """Updates the current operating pipeline instance with new behaviors. Used for temporary alterations."""
+        with await self.pipeline_lock:
+            if self.pipeline:
+                self.pipeline.update(behaviors)
+
     async def set_operating_pipeline(self, pipeline_id):
         with await self.pipeline_lock:
             if pipeline_id is None:
@@ -182,9 +196,6 @@ class Backend(object):
                 pipeline = self.get_pipeline(pipeline_id)
                 if pipeline:
                     self.pipeline = OperatingPipeline(pipeline)
-                    # run immediately
-                    self.pipeline.set_context(self.devices, self.get_last_readings())
-                    self.pipeline.run()
 
     def get_last_readings(self, modifier='-10 minutes'):
         """Returns a dict with the last readings from all sensors."""
