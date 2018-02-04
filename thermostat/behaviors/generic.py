@@ -81,7 +81,8 @@ def thermostat_control(log_source, context, device_id, target_temperature, cooli
         return False
 
     target_device = context.devices[device_id]
-    last_reading = context.last_reading['temperature']['_avg']['value']
+    last_reading = round(context.last_reading['temperature']['_avg']['value'], 1)
+    target_temperature = round(target_temperature, 1)
     if cooling:
         enabled = last_reading > target_temperature
     else:
