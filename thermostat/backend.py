@@ -52,11 +52,6 @@ class OperatingPipeline(object):
     def set_context(self, active_devices, last_reading):
         self.context = BehaviorContext(active_devices, last_reading)
 
-    def get_target_temperature(self):
-        """Returns the target temperature set during the last run."""
-        return self.context.params['target_temperature'] \
-            if 'target_temperature' in self.context.params else None
-
     def run(self):
         for behavior in list(self.chain):
             ret = behavior.execute(self.context)
