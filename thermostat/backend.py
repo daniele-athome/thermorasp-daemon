@@ -182,6 +182,8 @@ class Backend(object):
         with await self.pipeline_lock:
             if self.pipeline:
                 self.pipeline.update(behaviors)
+                self.pipeline.set_context(self.devices, self.get_last_readings())
+                self.pipeline.run()
 
     async def set_operating_pipeline(self, pipeline_id):
         with await self.pipeline_lock:
@@ -191,6 +193,8 @@ class Backend(object):
                 pipeline = self.get_pipeline(pipeline_id)
                 if pipeline:
                     self.pipeline = OperatingPipeline(pipeline)
+                    self.pipeline.set_context(self.devices, self.get_last_readings())
+                    self.pipeline.run()
 
     def get_last_readings(self, modifier='-10 minutes'):
         """Returns a dict with the last readings from all sensors."""
