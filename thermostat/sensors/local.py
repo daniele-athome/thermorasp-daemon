@@ -52,6 +52,8 @@ class GPIOW1SensorHandler(BaseSensorHandler):
                 sensor = W1ThermSensor(sensor_id=self.address)
                 temp = sensor.get_temperature(unit=W1ThermSensor.DEGREES_C)
 
+            # round it up to the nearest half since it's all we are interested in
+            temp = round(temp * 2) / 2
             return {
                 'value': temp,
                 'unit': 'celsius'
