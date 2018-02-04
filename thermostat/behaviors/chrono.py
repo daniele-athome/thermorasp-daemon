@@ -12,7 +12,7 @@ class CronBehavior(BaseBehavior):
     """Base interface for cron-based behaviors."""
 
     def __init__(self, behavior_id, behavior_type, config=None):
-        BaseBehavior.__init__(behavior_id, behavior_type, config)
+        BaseBehavior.__init__(self, behavior_id, config)
         self.crons = []
 
     def get_config_schema(self):
@@ -38,8 +38,8 @@ class CronBehavior(BaseBehavior):
 class WeeklyProgramBehavior(BaseBehavior):
     """Classic weekly program behavior."""
 
-    def __init__(self, behavior_id, behavior_type, config=None):
-        BaseBehavior.__init__(behavior_id, behavior_type, config)
+    def __init__(self, behavior_id, config=None):
+        BaseBehavior.__init__(self, behavior_id, config)
         self.target_device_id = config['target_device_id']
         self.cooling = config['mode'] == 'cooling'
         self.time_slices = []
@@ -47,17 +47,19 @@ class WeeklyProgramBehavior(BaseBehavior):
             if k.startswith('day'):
                 weekday = int(k[3:])
 
-                for jobspec in v['items']:
+                for jobspec in v:
                     time_start = datetime.datetime.strptime(jobspec['time_start'], '%H:%M')
                     time_start_sec = self.get_time_seconds(weekday, time_start.hour, time_start.minute)
-                    self.time_slices.append({'stamp': time_start_sec, 'target': v['target_temperature']})
-                    self.time_slices.sort(key=lambda sl: sl['stamp'], reverse=True)
+                    self.time_slices.append({'stamp': time_start_sec, 'target': jobspec['target_temperature']})
+
+        self.time_slices.sort(key=lambda sl: sl['stamp'], reverse=True)
 
     @staticmethod
-    def get_time_seconds(weekday, hour, minute):
+    def get_time_seconds(weekday, hour, minute, second=0):
         return (weekday * 24 * 60 * 60) + \
                (hour * 60 * 60) + \
-               (minute * 60)
+               (minute * 60) + \
+               second
 
     def get_config_schema(self):
         schema = {
@@ -102,12 +104,13 @@ class WeeklyProgramBehavior(BaseBehavior):
 
     def execute(self, context):
         now = datetime.datetime.now()
-        now_sec = self.get_time_seconds(now.weekday(), now.hour, now.minute)
+        now_sec = self.get_time_seconds(now.weekday(), now.hour, now.minute, now.second)
 
-        selected_slice = self.time_slices[-1]
+        selected_slice = self.time_slices[0]
         for sli in self.time_slices:
-            if sli['stamp'] < now_sec:
+            if sli['stamp'] <= now_sec:
                 selected_slice = sli
+                break
 
         target_temperature = selected_slice['target']
         thermostat_control(self.id, context, self.target_device_id, target_temperature, self.cooling)

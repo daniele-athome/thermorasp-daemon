@@ -29,4 +29,5 @@ setup(
     long_description=long_description,
     include_package_data=True,
     scripts=scripts,
-    install_requires=install_requires)
+    install_requires=install_requires,
+    test_suite='tests')
