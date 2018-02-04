@@ -86,6 +86,20 @@ async def update_active(request: Request):
 
 
 # noinspection PyUnusedLocal
+@app.put('/pipelines/active/rollback')
+async def update_active(request: Request):
+    """Rollback any modification to the active pipeline."""
+
+    if app.backend.pipeline is None:
+        raise errors.NotFoundError('Pipeline not found.')
+
+    # reload the same
+    await app.backend.set_operating_pipeline(app.backend.pipeline.id)
+
+    return no_content()
+
+
+# noinspection PyUnusedLocal
 @app.post('/pipelines')
 async def create(request: Request):
     """Creates a pipeline."""
