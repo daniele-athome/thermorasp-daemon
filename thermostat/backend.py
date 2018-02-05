@@ -174,8 +174,9 @@ class Backend(object):
                     log.debug("Activating pipeline #{} - {}".format(pipeline['id'], pipeline['name']))
                     self.pipeline = OperatingPipeline(pipeline)
 
-            self.pipeline.set_context(self.devices, self.get_last_readings())
-            self.pipeline.run()
+            if self.pipeline:
+                self.pipeline.set_context(self.devices, self.get_last_readings())
+                self.pipeline.run()
 
     async def update_operating_pipeline(self, behaviors):
         """Updates the current operating pipeline instance with new behaviors. Used for temporary alterations."""
