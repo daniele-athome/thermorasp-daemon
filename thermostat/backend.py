@@ -14,7 +14,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from .database import scoped_session
 from . import app, devices
 from .models import Sensor, Pipeline, Reading, Device
-from .models.sensors import store_reading
+from .models.sensors import store_reading, get_last_readings
 from .models import eventlog
 from .sensors import get_sensor_handler
 from .behaviors import BehaviorContext, get_behavior_handler
@@ -201,13 +201,7 @@ class Backend(object):
     def get_last_readings(self, modifier='-10 minutes'):
         """Returns a dict with the last readings from all sensors."""
         with scoped_session(self.app.database) as session:
-            rds = session.query(Reading).from_statement(text("select * \
-            from sensor_readings r join \
-            (select sensor_id, sensor_type, max(timestamp) timestamp from sensor_readings \
-            where timestamp > datetime('now', '"+modifier+"') \
-            group by sensor_id, sensor_type) as rmax \
-            on r.sensor_id = rmax.sensor_id and r.sensor_type = rmax.sensor_type and r.timestamp = rmax.timestamp \
-            order by timestamp desc")).all()
+            rds = get_last_readings(session, modifier)
 
             last = {}
             for reading in rds:

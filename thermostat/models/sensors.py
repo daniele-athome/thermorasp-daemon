@@ -2,11 +2,10 @@
 """Models for sensors and sensor readings."""
 
 from sqlalchemy import (
-    Column, String, Integer, DateTime
+    Column, String, Integer, DateTime, text, column
 )
 
 from . import Base
-from .. import app
 from ..database import scoped_session
 
 
@@ -60,7 +59,7 @@ class Reading(Base):
     # Methods
     def __repr__(self):
         """ Show sensor object info. """
-        return '<Reading: {}@{}>'.format(self.id, self.timestamp)
+        return '<Reading: {}@{}>'.format(self.sensor_id, self.timestamp)
 
 
 def store_reading(myapp, sensor_id, sensor_type, timestamp, unit, value):
@@ -72,3 +71,28 @@ def store_reading(myapp, sensor_id, sensor_type, timestamp, unit, value):
         reading.unit = unit
         reading.value = value
         session.add(reading)
+
+
+def get_last_readings(session, modifier='-10 minutes', sensor_type=None):
+    # FIXME use SQLAlchemy
+    params = {'modifier': modifier}
+    if sensor_type:
+        add_query = 'sensor_type = :sensor_type and'
+        params['sensor_type'] = sensor_type
+    else:
+        add_query = ''
+
+    return session.query(Reading).from_statement(text("select r.sensor_id sensor_id, r.sensor_type sensor_type, \
+        r.timestamp timestamp, r.unit unit, r.value value \
+        from sensor_readings r join \
+        (select sensor_id, sensor_type, max(timestamp) timestamp from sensor_readings \
+        where "+add_query+" timestamp > datetime('now', :modifier) \
+        group by sensor_id, sensor_type) as rmax \
+        on r.sensor_id = rmax.sensor_id and r.sensor_type = rmax.sensor_type and r.timestamp = rmax.timestamp \
+        order by timestamp desc").bindparams(**params).columns(
+        column('sensor_id', Integer),
+        column('sensor_type', String),
+        column('timestamp', DateTime),
+        column('unit', String),
+        column('value', String)
+        )).all()

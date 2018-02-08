@@ -11,7 +11,7 @@ from sqlalchemy.sql.expression import desc
 
 from .. import app, errors
 from ..database import scoped_session
-from ..models.sensors import Sensor, Reading
+from ..models.sensors import Sensor, Reading, get_last_readings
 
 SENSOR_STATUS_MAP = (
     'unknown',
@@ -94,6 +94,19 @@ async def unregister(request: Request):
             })
         except NoResultFound:
             raise errors.NotFoundError('Sensor not found.')
+
+
+# noinspection PyUnusedLocal
+@app.get('/sensors/reading')
+async def reading(request: Request):
+    """Reads the latest sensor reading for all sensors from the database."""
+
+    if 'sensor_type' not in request.args:
+        raise errors.NotFoundError('You must provide a sensor_type parameter')
+
+    with scoped_session(app.database) as session:
+        sensor_type = request.args['sensor_type'][0]
+        return json([serialize_sensor_reading(latest) for latest in get_last_readings(session, sensor_type=sensor_type)])
 
 
 # noinspection PyUnusedLocal
