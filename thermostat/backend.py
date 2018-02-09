@@ -80,6 +80,9 @@ class DeviceManager(object):
 
     def _register(self, device_id, device_type, protocol, address, name):
         """Creates a new device and stores the instance in the internal collection."""
+        if device_id in self.devices:
+            self._unregister(device_id)
+
         dev_instance = devices.get_device_handler(device_id, device_type, protocol, address, name)
         self.devices[device_id] = dev_instance
         dev_instance.startup()
@@ -90,13 +93,6 @@ class DeviceManager(object):
 
     def register(self, device_id, protocol, address, device_type, name):
         with scoped_session(self.database) as session:
-            # unregister old device if any
-            try:
-                old_device = session.query(Device).filter(Device.id == device_id).one()
-                self._unregister(old_device.id)
-            except NoResultFound:
-                pass
-
             device = Device()
             device.id = device_id
             device.name = name
@@ -104,6 +100,7 @@ class DeviceManager(object):
             device.address = address
             device.device_type = device_type
             device = session.merge(device)
+            # will also unregister old device if any
             self._register(device.id, device.device_type, device.protocol, device.address, device.name)
 
     def unregister(self, device_id):
