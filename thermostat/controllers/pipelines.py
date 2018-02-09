@@ -86,6 +86,20 @@ async def update_active(request: Request):
 
 
 # noinspection PyUnusedLocal
+@app.put('/pipelines/active/<order:int>')
+async def update_active(request: Request, order: int):
+    """Alter a single behavior in the active pipeline without persisting anything to the database."""
+
+    if app.backend.pipeline is None:
+        raise errors.NotFoundError('Pipeline not found.')
+
+    data = request.json
+    await app.backend.update_operating_behavior(order, data)
+
+    return no_content()
+
+
+# noinspection PyUnusedLocal
 @app.put('/pipelines/active/rollback')
 async def update_active(request: Request):
     """Rollback any modification to the active pipeline."""

@@ -44,6 +44,14 @@ class OperatingPipeline(object):
         self.chain.clear()
         self._reload_chain()
 
+    def update_config(self, behavior_order, config):
+        for behavior in self.pipeline['behaviors']:
+            if behavior['order'] == behavior_order:
+                behavior['config'] = config
+                self.chain.clear()
+                self._reload_chain()
+                break
+
     def _reload_chain(self):
         for behavior in self.pipeline['behaviors']:
             behavior_instance = get_behavior_handler(behavior['id'], behavior['config'])
@@ -180,6 +188,14 @@ class Backend(object):
         with await self.pipeline_lock:
             if self.pipeline:
                 self.pipeline.update(behaviors)
+                self.pipeline.set_context(self.devices, self.get_last_readings())
+                self.pipeline.run()
+
+    async def update_operating_behavior(self, behavior_order, config):
+        """Updates the configuration of a behavior in the current operating pipeline Used for temporary alterations."""
+        with await self.pipeline_lock:
+            if self.pipeline:
+                self.pipeline.update_config(behavior_order, config)
                 self.pipeline.set_context(self.devices, self.get_last_readings())
                 self.pipeline.run()
 
