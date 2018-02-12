@@ -23,6 +23,7 @@ def serialize_pipeline_behavior(b: Behavior):
     }
 
 
+# noinspection PyTypeChecker
 def serialize_pipeline(p: Pipeline):
     return {
         'id': p.id,
@@ -211,5 +212,24 @@ async def update(request: Request, pipeline_id: int):
         await app.backend.set_operating_pipeline(pipeline_id)
     elif app.backend.pipeline and app.backend.pipeline.id == pipeline_id:
         await app.backend.set_operating_pipeline(None)
+
+    return no_content()
+
+
+# noinspection PyUnusedLocal
+@app.put('/pipelines/<pipeline_id:int>/<order:int>')
+async def update_behavior(request: Request, pipeline_id: int, order: int):
+    """Alter a single behavior in a pipeline."""
+
+    data = request.json
+    with scoped_session(app.database) as session:
+        try:
+            behavior = session.query(Behavior) \
+                .filter(Behavior.pipeline == pipeline_id, Behavior.behavior_order == order).one()
+            behavior.config = data
+
+            session.add(behavior)
+        except NoResultFound:
+            raise errors.NotFoundError('Pipeline or behavior not found.')
 
     return no_content()
