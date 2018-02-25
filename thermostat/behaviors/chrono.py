@@ -5,7 +5,7 @@ import calendar
 import datetime
 
 from . import BaseBehavior
-from .generic import TemperatureBaseBehavior, ForceTemperatureBehavior, thermostat_control
+from .generic import ForceTemperatureBehavior, thermostat_control
 
 
 class CronBehavior(BaseBehavior):
@@ -137,9 +137,9 @@ class ForceTemperatureUntilBehavior(ForceTemperatureBehavior):
 
     def execute(self, context):
         now = datetime.datetime.now()
-        until = datetime.datetime(now.year, now.month, now.day, self.time.hour, self.time.minute)
+        until = now.replace(hour=self.time.hour, minute=self.time.minute, second=0, microsecond=0)
 
-        if now.timestamp() >= until.timestamp():
+        if now >= until:
             context.delete_self()
             # go ahead with the next behavior since we are removing ourselves
             return True
