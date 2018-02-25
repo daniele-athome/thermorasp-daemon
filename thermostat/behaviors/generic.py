@@ -5,34 +5,8 @@ from . import BaseBehavior
 from ..models import eventlog
 
 
-class TargetTemperatureBehavior(BaseBehavior):
-    """
-    A behavior to alter the target temperature in the chain to a certain level.
-    Behaviors will need to read target_temperature from the context parameters.
-    """
-
-    def __init__(self, behavior_id, config=None):
-        BaseBehavior.__init__(self, behavior_id, config)
-        self.target_temperature = config['target_temperature']
-
-    def get_config_schema(self):
-        return {
-            'target_temperature': {
-                'label': 'Target temperature',
-                'description': 'The temperature to maintain in the environment.',
-                'type': 'float:1',
-                'form_type': 'power_handle',
-            },
-        }
-
-    def execute(self, context):
-        # behaviors supporting this parameter will use it
-        context.params['target_temperature'] = self.target_temperature
-        return True
-
-
-class ForceTemperatureBehavior(BaseBehavior):
-    """A behavior to always keep the temperature at a certain level."""
+class TemperatureBaseBehavior(BaseBehavior):
+    """A base behavior for setting a target temperature."""
 
     def __init__(self, behavior_id, config=None):
         BaseBehavior.__init__(self, behavior_id, config)
@@ -62,6 +36,42 @@ class ForceTemperatureBehavior(BaseBehavior):
                 'form_type': 'power_handle',
             },
         }
+
+    def execute(self, context):
+        raise NotImplementedError()
+
+
+class TargetTemperatureBehavior(BaseBehavior):
+    """
+    A behavior to alter the target temperature in the chain to a certain level.
+    Behaviors will need to read target_temperature from the context parameters.
+    """
+
+    def __init__(self, behavior_id, config=None):
+        BaseBehavior.__init__(self, behavior_id, config)
+        self.target_temperature = config['target_temperature']
+
+    def get_config_schema(self):
+        return {
+            'target_temperature': {
+                'label': 'Target temperature',
+                'description': 'The temperature to maintain in the environment.',
+                'type': 'float:1',
+                'form_type': 'power_handle',
+            },
+        }
+
+    def execute(self, context):
+        # behaviors supporting this parameter will use it
+        context.params['target_temperature'] = self.target_temperature
+        return True
+
+
+class ForceTemperatureBehavior(TemperatureBaseBehavior):
+    """A behavior to always keep the temperature at a certain level."""
+
+    def __init__(self, behavior_id, config=None):
+        TemperatureBaseBehavior.__init__(self, behavior_id, config)
 
     def execute(self, context):
         thermostat_control(self.id, context, self.target_device_id, self.target_temperature, self.cooling)

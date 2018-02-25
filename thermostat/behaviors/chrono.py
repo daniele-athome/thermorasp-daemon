@@ -5,13 +5,13 @@ import calendar
 import datetime
 
 from . import BaseBehavior
-from .generic import thermostat_control
+from .generic import TemperatureBaseBehavior, ForceTemperatureBehavior, thermostat_control
 
 
 class CronBehavior(BaseBehavior):
     """Base interface for cron-based behaviors."""
 
-    def __init__(self, behavior_id, behavior_type, config=None):
+    def __init__(self, behavior_id, config=None):
         BaseBehavior.__init__(self, behavior_id, config)
         self.crons = []
 
@@ -116,3 +116,32 @@ class WeeklyProgramBehavior(BaseBehavior):
         thermostat_control(self.id, context, self.target_device_id, target_temperature, self.cooling)
         # the chain stops here
         return False
+
+
+class ForceTemperatureUntilBehavior(ForceTemperatureBehavior):
+    """A behavior to keep the temperature at a certain level until some time in the same day."""
+
+    def __init__(self, behavior_id, config=None):
+        ForceTemperatureBehavior.__init__(self, behavior_id, config)
+        self.time = datetime.datetime.strptime(config['time'], '%H:%M')
+
+    def get_config_schema(self):
+        cfg = ForceTemperatureBehavior.get_config_schema(self)
+        cfg['time'] = {
+            'label': 'End time',
+            'description': 'Until what time set this temperature.',
+            'type': 'time:%H:%M',
+            'form_type': 'time',
+        }
+        return cfg
+
+    def execute(self, context):
+        now = datetime.datetime.now()
+        until = datetime.datetime(now.year, now.month, now.day, self.time.hour, self.time.minute)
+
+        if now.timestamp() >= until.timestamp():
+            context.delete_self()
+            # go ahead with the next behavior since we are removing ourselves
+            return True
+        else:
+            return ForceTemperatureBehavior.execute(self, context)
