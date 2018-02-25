@@ -20,8 +20,13 @@ class BehaviorContext(object):
         """
         self.devices = devices
         self.last_reading = last_reading
+        self.delete = False
         # this will be passed among all behaviors in the chain
         self.params = {}
+
+    def delete_self(self):
+        """Behaviors will call this if they wants to be removed from the active pipeline."""
+        self.delete = True
 
 
 class BaseBehavior(object):

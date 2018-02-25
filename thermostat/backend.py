@@ -63,6 +63,10 @@ class OperatingPipeline(object):
     def run(self):
         for behavior in list(self.chain):
             ret = behavior.execute(self.context)
+            if self.context.delete:
+                # behavior requested to be removed
+                self.chain.remove(behavior)
+                self.context.delete = False
             if not ret:
                 break
 
