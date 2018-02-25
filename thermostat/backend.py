@@ -30,7 +30,7 @@ class OperatingPipeline(object):
     def __init__(self, pipeline):
         self.pipeline = pipeline
         self.context = None
-        self.chain = []
+        self.chain = None
         self._reload_chain()
 
     def __getattr__(self, item):
@@ -41,31 +41,29 @@ class OperatingPipeline(object):
 
     def update(self, behaviors):
         self.pipeline['behaviors'] = behaviors
-        self.chain.clear()
         self._reload_chain()
 
     def update_config(self, behavior_order, config):
         for behavior in self.pipeline['behaviors']:
             if behavior['order'] == behavior_order:
                 behavior['config'] = config
-                self.chain.clear()
                 self._reload_chain()
                 break
 
     def _reload_chain(self):
-        for behavior in self.pipeline['behaviors']:
-            behavior_instance = get_behavior_handler(behavior['id'], behavior['config'])
-            self.chain.append(behavior_instance)
+        self.chain = [get_behavior_handler(behavior['id'], behavior['config'])
+                      for behavior in self.pipeline['behaviors']]
 
     def set_context(self, active_devices, last_reading):
         self.context = BehaviorContext(active_devices, last_reading)
 
     def run(self):
-        for behavior in list(self.chain):
+        for idx, behavior in enumerate(list(self.chain)):
             ret = behavior.execute(self.context)
             if self.context.delete:
                 # behavior requested to be removed
-                self.chain.remove(behavior)
+                del self.pipeline['behaviors'][idx]
+                self._reload_chain()
                 self.context.delete = False
             if not ret:
                 break
