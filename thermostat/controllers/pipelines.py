@@ -88,7 +88,7 @@ async def update_active(request: Request):
 
 # noinspection PyUnusedLocal
 @app.put('/pipelines/active/<order:int>')
-async def update_active(request: Request, order: int):
+async def update_config_active(request: Request, order: int):
     """Alter a single behavior in the active pipeline without persisting anything to the database."""
 
     if app.backend.pipeline is None:
@@ -102,7 +102,7 @@ async def update_active(request: Request, order: int):
 
 # noinspection PyUnusedLocal
 @app.put('/pipelines/active/rollback')
-async def update_active(request: Request):
+async def rollback_active(request: Request):
     """Rollback any modification to the active pipeline."""
 
     if app.backend.pipeline is None:
