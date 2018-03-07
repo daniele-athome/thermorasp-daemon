@@ -14,7 +14,8 @@ class TemperatureBaseBehavior(BaseBehavior):
         self.cooling = config['mode'] == 'cooling'
         self.target_temperature = config['target_temperature']
 
-    def get_config_schema(self):
+    @classmethod
+    def get_config_schema(cls):
         return {
             'target_device_id': {
                 'label': 'Target device id',
@@ -51,7 +52,8 @@ class TargetTemperatureBehavior(BaseBehavior):
         BaseBehavior.__init__(self, behavior_id, config)
         self.target_temperature = config['target_temperature']
 
-    def get_config_schema(self):
+    @classmethod
+    def get_config_schema(cls):
         return {
             'target_temperature': {
                 'label': 'Target temperature',

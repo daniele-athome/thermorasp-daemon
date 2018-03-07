@@ -39,7 +39,8 @@ class BaseBehavior(object):
             self.config = {}
         # TODO check config based on schema
 
-    def get_config_schema(self):
+    @classmethod
+    def get_config_schema(cls):
         """Returns the configuration schema for this behavior."""
         raise NotImplementedError()
 

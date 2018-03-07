@@ -15,7 +15,8 @@ class CronBehavior(BaseBehavior):
         BaseBehavior.__init__(self, behavior_id, config)
         self.crons = []
 
-    def get_config_schema(self):
+    @classmethod
+    def get_config_schema(cls):
         """Must be implemented by child classes."""
         raise NotImplementedError()
 
@@ -61,7 +62,8 @@ class WeeklyProgramBehavior(BaseBehavior):
                (minute * 60) + \
                second
 
-    def get_config_schema(self):
+    @classmethod
+    def get_config_schema(cls):
         schema = {
             'target_device_id': {
                 'label': 'Target device id',
@@ -125,8 +127,9 @@ class ForceTemperatureUntilBehavior(ForceTemperatureBehavior):
         ForceTemperatureBehavior.__init__(self, behavior_id, config)
         self.time = datetime.datetime.strptime(config['time'], '%H:%M')
 
-    def get_config_schema(self):
-        cfg = ForceTemperatureBehavior.get_config_schema(self)
+    @classmethod
+    def get_config_schema(cls):
+        cfg = ForceTemperatureBehavior.get_config_schema()
         cfg['time'] = {
             'label': 'End time',
             'description': 'Until what time set this temperature.',
