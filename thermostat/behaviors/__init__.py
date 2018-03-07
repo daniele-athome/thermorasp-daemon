@@ -54,10 +54,16 @@ class BaseBehavior(object):
         raise NotImplementedError()
 
 
-def get_behavior_handler(behavior_id: str, config: dict) -> BaseBehavior:
-    """Returns an appropriate behavior handler for the given behavior id."""
+def get_behavior_handler_class(behavior_id: str):
+    """Returns an appropriate behavior handler class object for the given behavior id."""
     b_module, b_class = behavior_id.split('.', 1)
     module = importlib.import_module('.'+b_module, __name__)
     if module:
-        handler_class = getattr(module, b_class)
+        return getattr(module, b_class)
+
+
+def get_behavior_handler(behavior_id: str, config: dict) -> BaseBehavior:
+    """Returns an appropriate behavior handler instance for the given behavior id."""
+    handler_class = get_behavior_handler_class(behavior_id)
+    if handler_class:
         return handler_class(behavior_id, config)
