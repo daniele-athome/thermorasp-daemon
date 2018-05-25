@@ -133,6 +133,8 @@ class Backend(object):
         # the operating (active) pipeline
         self.pipeline = None
         self.pipeline_lock = asyncio.Lock()
+        # sensor futures
+        self.sensor_tasks = {}
 
     async def run(self):
         while self.app.is_running:
@@ -273,14 +275,25 @@ class Backend(object):
             return [dict(s) for s in session.execute(stmt)]
 
     def read_passive_sensors(self, sensor_type):
+        loop = asyncio.get_event_loop()
         pasv_sensors = self.get_passive_sensors()
         for sensor_info in pasv_sensors:
-            handler = get_sensor_handler(sensor_info['protocol'], sensor_info['address'])
+            if sensor_info['id'] not in self.sensor_tasks:
+                handler = get_sensor_handler(sensor_info['protocol'], sensor_info['address'])
+                self.sensor_tasks[sensor_info['id']] = loop.run_in_executor(None, self.do_read_passive_sensor,
+                                                                            sensor_type, sensor_info, handler)
+
+    def do_read_passive_sensor(self, sensor_type, sensor_info, handler):
+        try:
             reading = handler.read(sensor_type)
             log.debug("%s: %s", sensor_info['id'], reading)
             # store reading in database
             store_reading(self.app, sensor_info['id'], sensor_type,
                           datetime.datetime.now(), reading['unit'], reading['value'])
+        except ValueError:
+            eventlog.event_exc(eventlog.LEVEL_WARNING, 'sensor', 'exception')
+        finally:
+            del self.sensor_tasks[sensor_info['id']]
 
 
 # noinspection PyUnusedLocal

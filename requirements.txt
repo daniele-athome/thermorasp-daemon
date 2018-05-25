@@ -3,3 +3,4 @@ SQLAlchemy==1.2.1
 alembic==0.9.7
 w1thermsensor==1.0.5
 sdnotify==0.3.2
+requests==2.18.4
