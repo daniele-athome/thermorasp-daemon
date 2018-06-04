@@ -8,7 +8,7 @@ from .. import errors
 
 
 class HTTPSensorHandler(BaseSensorHandler):
-    """A sensor handler that returns random values for various sensor types."""
+    """A sensor handler that requests data to a HTTP endpoint."""
 
     def __init__(self, address):
         BaseSensorHandler.__init__(self, address)
