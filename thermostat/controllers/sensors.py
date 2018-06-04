@@ -101,11 +101,12 @@ async def unregister(request: Request):
 async def reading(request: Request):
     """Reads the latest sensor reading for all sensors from the database."""
 
-    if 'sensor_type' not in request.args:
-        raise errors.NotFoundError('You must provide a sensor_type parameter')
+    if 'sensor_type' in request.args:
+        sensor_type = request.args['sensor_type'][0]
+    else:
+        sensor_type = None
 
     with scoped_session(app.database) as session:
-        sensor_type = request.args['sensor_type'][0]
         return json([serialize_sensor_reading(latest) for latest in get_last_readings(session, sensor_type=sensor_type)])
 
 
