@@ -11,7 +11,7 @@ from sqlalchemy.sql.expression import desc
 
 from .. import app, errors
 from ..database import scoped_session
-from ..models.sensors import Sensor, Reading, get_last_readings
+from ..models.sensors import Sensor, Reading, get_last_readings, is_active_sensor
 
 SENSOR_STATUS_MAP = (
     'unknown',
@@ -126,14 +126,17 @@ async def reading(request: Request):
 
     in_data = request.json
     with scoped_session(app.database) as session:
-        mreading = Reading()
-        mreading.sensor_id = in_data['sensor_id']
-        mreading.sensor_type = in_data['type']
-        mreading.unit = in_data['unit']
-        mreading.value = in_data['value']
-        if 'timestamp' in in_data:
-            mreading.timestamp = in_data['timestamp']
+        if is_active_sensor(session, in_data['sensor_id']):
+            mreading = Reading()
+            mreading.sensor_id = in_data['sensor_id']
+            mreading.sensor_type = in_data['type']
+            mreading.unit = in_data['unit']
+            mreading.value = in_data['value']
+            if 'timestamp' in in_data:
+                mreading.timestamp = in_data['timestamp']
+            else:
+                mreading.timestamp = datetime.datetime.now()
+            session.add(mreading)
+            return json(serialize_sensor_reading(mreading))
         else:
-            mreading.timestamp = datetime.datetime.now()
-        session.add(mreading)
-        return json(serialize_sensor_reading(mreading))
+            raise errors.NotFoundError('Sensor not found.')

@@ -4,6 +4,7 @@
 from sqlalchemy import (
     Column, String, Integer, DateTime, text, column
 )
+from sqlalchemy.orm.exc import NoResultFound
 
 from . import Base
 from ..database import scoped_session
@@ -96,3 +97,8 @@ def get_last_readings(session, modifier='-10 minutes', sensor_type=None):
         column('unit', String),
         column('value', String)
         )).all()
+
+
+def is_active_sensor(session, sensor_id):
+    """Return true if the given sensor is registered as an active sensor."""
+    return session.query(Sensor).filter(Sensor.id == sensor_id).count() == 1
