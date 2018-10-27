@@ -230,11 +230,12 @@ class Backend(object):
                     'value': float(reading.value),
                 }
 
-            # compute averages
+            # compute averages for temperature
             # TODO account for different units
             for sensor_type, values in last.items():
-                all_values = [v['value'] for k, v in values.items()]
-                values['_avg'] = {'value': sum(all_values) / len(all_values)}
+                if sensor_type == 'temperature':
+                    all_values = [v['value'] for k, v in values.items()]
+                    values['_avg'] = {'value': sum(all_values) / len(all_values)}
 
             return last
 
