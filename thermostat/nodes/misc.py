@@ -15,6 +15,7 @@ class TimerNode(object):
         self.topic = "/".join([
             device.baseTopic,
             device.deviceId,
+            node_id,
             '_internal'])
         self._prop_seconds = self.node.addProperty('seconds', 'Seconds', 's', 'integer', '1:86400')
         self._prop_seconds.settable(self._set_seconds)
@@ -30,5 +31,5 @@ class TimerNode(object):
 
     async def _loop(self, seconds):
         await asyncio.sleep(seconds)
-        self.device.publish(self.topic, 'timer')
+        self.device.publish(self.topic, 'timer', False)
         self._set_timer(seconds)
