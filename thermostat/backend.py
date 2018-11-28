@@ -8,11 +8,9 @@ import datetime
 import sdnotify
 import json
 
-import homie
-
 from sqlalchemy.orm.exc import NoResultFound
 
-import paho.mqtt.client as paho_mqtt
+import hbmqtt.client as mqtt_client
 
 from .database import scoped_session
 from . import app, devices
@@ -130,9 +128,8 @@ class DeviceManager(object):
 class Backend(object):
     """The backend operations thread."""
 
-    def __init__(self, myapp, loop):
+    def __init__(self, myapp):
         self.app = myapp
-        self.loop = loop
         self.devices = DeviceManager(self.app.database)
         # the operating (active) pipeline
         self.pipeline = None
@@ -141,26 +138,28 @@ class Backend(object):
         self.sensor_tasks = {}
 
         # connect to broker
-        self.broker = paho_mqtt.Client('Homie-' + str(self.app.config['DEVICE_ID']) + '-backend')
-        self.broker.on_connect = self._connected
-        self.broker.on_message = self._message
-        self.broker.connect_async(self.app.config['BROKER_HOST'], self.app.config['BROKER_PORT'])
-        self.broker.loop_start()
+        self.broker = mqtt_client.MQTTClient(str(self.app.config['DEVICE_ID']) + '-backend')
+        self.app.add_task(self._connect())
 
-    def _connected(self, client: paho_mqtt.Client, *args):
+    async def _connect(self):
+        await self.broker.connect(self.app.broker_url)
         log.debug("Backend is connected to broker")
-        client.subscribe(self.app.timer.topic)
+        await self.broker.subscribe([(self.app.timer.topic, mqtt_client.QOS_0)])
+        await self.backend()
+        while self.app.is_running:
+            message = await self.broker.deliver_message()
+            log.debug("BROKER topic={}, payload={}".format(message.topic, message.data))
+            if message.topic == self.app.timer.topic:
+                if message.data == b'timer':
+                    await self.backend()
 
-    def _message(self, client: paho_mqtt.Client, userdata, message: paho_mqtt.MQTTMessage):
-        #log.debug("BROKER topic={}, payload={}".format(message.topic, message.payload))
-        if message.topic == self.app.timer.topic:
-            if message.payload == b'timer':
-                log.debug("BACKEND RUNNING")
-                try:
-                    asyncio.run_coroutine_threadsafe(self.backend_ops(), self.loop)
-                except:
-                    log.error('Unexpected error:', exc_info=sys.exc_info())
-                    eventlog.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
+    async def backend(self):
+        try:
+            log.debug("BACKEND RUNNING")
+            await self.backend_ops()
+        except:
+            log.error('Unexpected error:', exc_info=sys.exc_info())
+            eventlog.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
 
     async def sensors(self):
         while self.app.is_running:
@@ -314,6 +313,7 @@ class Backend(object):
 # noinspection PyUnusedLocal
 @app.listener('before_server_start')
 async def init_backend(sanic, loop):
+    """
     app.device = homie.Device({
         'HOST': app.config['BROKER_HOST'],
         'PORT': app.config['BROKER_PORT'],
@@ -322,18 +322,29 @@ async def init_backend(sanic, loop):
         'DEVICE_ID': str(app.config['DEVICE_ID']),
         'DEVICE_NAME': app.config['DEVICE_NAME'],
     })
+    """
+    app.broker_url = 'mqtt://' + app.config['BROKER_HOST'] + ':' + str(app.config['BROKER_PORT']) + '/'
 
     # start the timer node
     from .nodes import misc
-    app.timer = misc.TimerNode(app.device, 'timer', 'Timer', app.config['BACKEND_INTERVAL'])
+    app.timer = misc.TimerNode(app, app.config['BROKER_TOPIC'], app.config['DEVICE_ID'],
+                               'timer', app.config['BACKEND_INTERVAL'])
 
-    app.backend = Backend(app, loop)
+    app.backend = Backend(app)
     #asyncio.ensure_future(app.backend.sensors(), loop=loop)
 
 
 # noinspection PyUnusedLocal
 @app.listener('after_server_start')
 async def notify_systemd(sanic, loop):
-    app.device.setup()
     n = sdnotify.SystemdNotifier()
     n.notify("READY=1")
+
+
+@app.listener('before_server_stop')
+async def stop_all_tasks(sanic, loop):
+    await loop.shutdown_asyncgens()
+    #for task in asyncio.Task.all_tasks():
+    #    task.cancel()
+    _shutdown = asyncio.gather(*asyncio.Task.all_tasks(), loop=loop)
+    await _shutdown
