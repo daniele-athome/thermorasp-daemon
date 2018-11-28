@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import asyncio
+import uvloop
+
 from argparse import ArgumentParser
 
 from thermostat import app, database
@@ -14,4 +17,7 @@ args = parser.parse_args()
 
 app.config.from_pyfile(args.config)
 app.database = database.init(app.config)
-app.run(host=args.host, port=args.port, workers=1, debug=args.debug)
+
+loop = uvloop.new_event_loop()
+asyncio.set_event_loop(loop)
+app.run(host=args.host, port=args.port, workers=1, debug=args.debug, loop=loop)

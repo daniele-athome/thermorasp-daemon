@@ -8,8 +8,12 @@ import datetime
 import sdnotify
 import json
 
+import homie
+
 from sqlalchemy import text
 from sqlalchemy.orm.exc import NoResultFound
+
+import paho.mqtt.client as paho_mqtt
 
 from .database import scoped_session
 from . import app, devices
@@ -127,14 +131,37 @@ class DeviceManager(object):
 class Backend(object):
     """The backend operations thread."""
 
-    def __init__(self, myapp):
+    def __init__(self, myapp, loop):
         self.app = myapp
+        self.loop = loop
         self.devices = DeviceManager(self.app.database)
         # the operating (active) pipeline
         self.pipeline = None
         self.pipeline_lock = asyncio.Lock()
         # sensor futures
         self.sensor_tasks = {}
+
+        # connect to broker
+        self.broker = paho_mqtt.Client('Homie-' + str(self.app.config['DEVICE_ID']) + '-backend')
+        self.broker.on_connect = self._connected
+        self.broker.on_message = self._message
+        self.broker.connect_async(self.app.config['BROKER_HOST'], self.app.config['BROKER_PORT'])
+        self.broker.loop_start()
+
+    def _connected(self, client: paho_mqtt.Client, *args):
+        log.debug("Backend is connected to broker")
+        client.subscribe(self.app.timer.topic)
+
+    def _message(self, client: paho_mqtt.Client, userdata, message: paho_mqtt.MQTTMessage):
+        #log.debug("BROKER topic={}, payload={}".format(message.topic, message.payload))
+        if message.topic == self.app.timer.topic:
+            if message.payload == b'timer':
+                log.debug("BACKEND RUNNING")
+                try:
+                    asyncio.run_coroutine_threadsafe(self.backend_ops(), self.loop)
+                except:
+                    log.error('Unexpected error:', exc_info=sys.exc_info())
+                    eventlog.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
 
     async def run(self):
         while self.app.is_running:
@@ -300,13 +327,27 @@ class Backend(object):
 # noinspection PyUnusedLocal
 @app.listener('before_server_start')
 async def init_backend(sanic, loop):
-    app.backend = Backend(app)
-    asyncio.ensure_future(app.backend.run(), loop=loop)
-    asyncio.ensure_future(app.backend.sensors(), loop=loop)
+    app.device = homie.Device({
+        'HOST': app.config['BROKER_HOST'],
+        'PORT': app.config['BROKER_PORT'],
+        'TOPIC': app.config['BROKER_TOPIC'],
+        'KEEPALIVE': 60,
+        'DEVICE_ID': str(app.config['DEVICE_ID']),
+        'DEVICE_NAME': app.config['DEVICE_NAME'],
+    })
+
+    # start the timer node
+    from .nodes import misc
+    app.timer = misc.TimerNode(app.device, 'timer', 'Timer', app.config['BACKEND_INTERVAL'])
+
+    app.backend = Backend(app, loop)
+    #asyncio.ensure_future(app.backend.run(), loop=loop)
+    #asyncio.ensure_future(app.backend.sensors(), loop=loop)
 
 
 # noinspection PyUnusedLocal
 @app.listener('after_server_start')
 async def notify_systemd(sanic, loop):
+    app.device.setup()
     n = sdnotify.SystemdNotifier()
     n.notify("READY=1")
