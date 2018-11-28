@@ -10,7 +10,6 @@ import json
 
 import homie
 
-from sqlalchemy import text
 from sqlalchemy.orm.exc import NoResultFound
 
 import paho.mqtt.client as paho_mqtt
@@ -162,18 +161,6 @@ class Backend(object):
                 except:
                     log.error('Unexpected error:', exc_info=sys.exc_info())
                     eventlog.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
-
-    async def run(self):
-        while self.app.is_running:
-            log.debug("BACKEND RUNNING")
-
-            try:
-                await self.backend_ops()
-            except:
-                log.error('Unexpected error:', exc_info=sys.exc_info())
-                eventlog.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
-
-            await asyncio.sleep(self.app.config['BACKEND_INTERVAL'])
 
     async def sensors(self):
         while self.app.is_running:
@@ -341,7 +328,6 @@ async def init_backend(sanic, loop):
     app.timer = misc.TimerNode(app.device, 'timer', 'Timer', app.config['BACKEND_INTERVAL'])
 
     app.backend = Backend(app, loop)
-    #asyncio.ensure_future(app.backend.run(), loop=loop)
     #asyncio.ensure_future(app.backend.sensors(), loop=loop)
 
 
