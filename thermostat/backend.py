@@ -11,11 +11,12 @@ import json
 from sqlalchemy.orm.exc import NoResultFound
 
 import hbmqtt.client as mqtt_client
+from dateutil.parser import parse as parse_date
 
 from .database import scoped_session
 from . import app, devices
-from .models import Sensor, Pipeline, Device, EventLog
-from .models.sensors import store_reading, get_last_readings
+from .models import Sensor, Pipeline, Device, Reading, EventLog
+from .models.sensors import get_last_readings
 from .models import eventlog
 from .sensors import get_sensor_handler
 from .behaviors import BehaviorContext, get_behavior_handler
@@ -147,33 +148,147 @@ class DeviceManager(object):
             return False
 
 
+class SensorManager(object):
+
+    def __init__(self, database, broker: mqtt_client.MQTTClient):
+        self.database = database
+        self.broker = None
+        self.sensors = {}
+        # subscription futures
+        self.sensors_subs = {}
+        self._init()
+        # _init must see a null broker
+        self.broker = broker
+
+    def __getitem__(self, item):
+        return self.sensors[item]
+
+    def values(self):
+        return self.sensors.values()
+
+    def subscribe_all(self):
+        for sensor_instance in self.sensors.values():
+            self.sensors_subs[sensor_instance.id] = asyncio.ensure_future(self._subscribe_sensor(sensor_instance))
+            sensor_instance.startup()
+
+    def _init(self):
+        with scoped_session(self.database) as session:
+            stmt = Sensor.__table__.select()
+            for d in session.execute(stmt):
+                self._register(d['id'], d['protocol'], d['address'])
+
+    def _register(self, sensor_id, protocol, address):
+        """Creates a new sensor and stores the instance in the internal collection."""
+        if sensor_id in self.sensors:
+            self._unregister(sensor_id)
+
+        sensor_instance = get_sensor_handler(sensor_id, protocol, address)
+        self.sensors[sensor_id] = sensor_instance
+        if self.broker:
+            sensor_instance.startup()
+            self.sensors_subs[sensor_id] = asyncio.ensure_future(self._subscribe_sensor(sensor_instance))
+
+    def _unregister(self, sensor_id):
+        self.sensors[sensor_id].shutdown()
+        self.sensors_subs[sensor_id].cancel()
+        del self.sensors[sensor_id]
+        del self.sensors_subs[sensor_id]
+
+    async def _subscribe_sensor(self, sensor_instance):
+        await self.broker.subscribe([(sensor_instance.topic + '/+', mqtt_client.QOS_0)])
+        while app.is_running and sensor_instance.is_running:
+            message = await self.broker.deliver_message()
+            log.debug("SENSORMANAGER topic={}, payload={}".format(message.topic, message.data))
+            if message.topic.startswith(sensor_instance.topic):
+                topic = message.topic.split('/')
+                sensor_type = topic[-1]
+                data = json.loads(message.data.decode('utf-8'))
+                # store reading in database
+                self.store_reading(sensor_instance.id, sensor_type,
+                                   parse_date(data['timestamp']), data['unit'], data['value'])
+
+    def store_reading(self, sensor_id, sensor_type, timestamp, unit, value):
+        with scoped_session(self.database) as session:
+            reading = Reading()
+            reading.sensor_id = sensor_id
+            reading.sensor_type = sensor_type
+            reading.timestamp = timestamp
+            reading.unit = unit
+            reading.value = value
+            session.add(reading)
+
+    def register(self, sensor_id, protocol, address, sensor_type):
+        with scoped_session(self.database) as session:
+            sensor = Sensor()
+            sensor.id = sensor_id
+            sensor.protocol = protocol
+            sensor.address = address
+            sensor.sensor_type = sensor_type
+            sensor = session.merge(sensor)
+            # will also unregister old device if any
+            self._register(sensor.id, sensor.protocol, sensor.address)
+
+    def unregister(self, sensor_id):
+        try:
+            self._unregister(sensor_id)
+            with scoped_session(self.database) as session:
+                device = session.query(Sensor).filter(Sensor.id == sensor_id).one()
+                session.delete(device)
+            return True
+        except (NoResultFound, KeyError):
+            return False
+
+    def get_last_readings(self, sensor_type='temperature'):
+        """Returns a dict with the last readings from all sensors."""
+        with scoped_session(self.database) as session:
+            rds = get_last_readings(session, modifier)
+
+            last = {}
+            for reading in rds:
+                if reading.sensor_type not in last:
+                    last[reading.sensor_type] = {}
+                last[reading.sensor_type][reading.sensor_id] = {
+                    'timestamp': reading.timestamp,
+                    'unit': reading.unit,
+                    'value': float(reading.value),
+                }
+
+            # compute averages for temperature
+            # TODO account for different units
+            for sensor_type, values in last.items():
+                if sensor_type == 'temperature':
+                    all_values = [v['value'] for k, v in values.items()]
+                    values['_avg'] = {'value': sum(all_values) / len(all_values)}
+
+            return last
+
+
 class Backend(object):
     """The backend operations thread."""
 
     def __init__(self, myapp):
         self.app = myapp
+        self.broker = mqtt_client.MQTTClient()
+        self.sensors = SensorManager(self.app.database, self.broker)
         self.devices = DeviceManager(self.app.database)
         self.event_logger = EventLogger(self.app.database)
         # the operating (active) pipeline
         self.pipeline = None
         self.pipeline_lock = asyncio.Lock()
-        # sensor futures
-        self.sensor_tasks = {}
-        self.broker = mqtt_client.MQTTClient(str(self.app.config['DEVICE_ID']) + '-backend')
         self.timer = None
 
         # start the timer node
         from .nodes import misc
-        self.timer = misc.TimerNode(self.app.config['BROKER_TOPIC'], self.app.config['DEVICE_ID'],
-                                    'timer', int(self.app.config['BACKEND_INTERVAL']))
+        self.timer = misc.TimerNode('timer', int(self.app.config['BACKEND_INTERVAL']))
 
         # connect to broker
         asyncio.ensure_future(self._connect())
 
     async def _connect(self):
         await self.broker.connect(self.app.broker_url)
-        log.debug("Backend is connected to broker")
+        log.debug("Backend connected to broker")
         await self.broker.subscribe([(self.timer.topic, mqtt_client.QOS_0)])
+        self.sensors.subscribe_all()
         await self.backend()
         while self.app.is_running:
             message = await self.broker.deliver_message()
@@ -189,24 +304,6 @@ class Backend(object):
         except:
             log.error('Unexpected error:', exc_info=sys.exc_info())
             self.event_logger.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
-
-    async def sensors(self):
-        while self.app.is_running:
-            log.debug("SENSORS RUNNING")
-
-            try:
-                self.sensors_ops()
-            except:
-                log.error('Unexpected error:', exc_info=sys.exc_info())
-                self.event_logger.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
-
-            await asyncio.sleep(self.app.config['SENSORS_INTERVAL'])
-
-    def sensors_ops(self):
-        """Passive sensors reading are here."""
-
-        # read temperatures
-        self.read_passive_sensors('temperature')
 
     async def backend_ops(self):
         """All backend cycle operations are here."""
@@ -317,31 +414,14 @@ class Backend(object):
             stmt = Sensor.__table__.select()
             return [dict(s) for s in session.execute(stmt)]
 
-    def read_passive_sensors(self, sensor_type):
-        loop = asyncio.get_event_loop()
-        pasv_sensors = self.get_passive_sensors()
-        for sensor_info in pasv_sensors:
-            if sensor_info['id'] not in self.sensor_tasks:
-                handler = get_sensor_handler(sensor_info['protocol'], sensor_info['address'])
-                self.sensor_tasks[sensor_info['id']] = loop.run_in_executor(None, self.do_read_passive_sensor,
-                                                                            sensor_type, sensor_info, handler)
-
-    def do_read_passive_sensor(self, sensor_type, sensor_info, handler):
-        try:
-            reading = handler.read(sensor_type)
-            log.debug("%s: %s", sensor_info['id'], reading)
-            # store reading in database
-            store_reading(self.app, sensor_info['id'], sensor_type,
-                          datetime.datetime.now(), reading['unit'], reading['value'])
-        except ValueError:
-            self.event_logger.event_exc(eventlog.LEVEL_WARNING, 'sensor', 'exception')
-        finally:
-            del self.sensor_tasks[sensor_info['id']]
-
 
 # noinspection PyUnusedLocal
 @app.listener('before_server_start')
 async def init_backend(sanic, loop):
-    app.backend = Backend(app)
-    n = sdnotify.SystemdNotifier()
-    n.notify("READY=1")
+    try:
+        app.backend = Backend(app)
+        n = sdnotify.SystemdNotifier()
+        n.notify("READY=1")
+    except:
+        log.error('Unexpected error:', exc_info=sys.exc_info())
+        sanic.stop()

@@ -6,7 +6,7 @@ from asyncio import CancelledError
 
 import uvloop
 
-from signal import signal, SIGINT
+from signal import signal, SIGINT, SIGTERM
 from argparse import ArgumentParser
 
 from thermostat import app, database
@@ -28,6 +28,7 @@ server = app.create_server(host=args.host, port=args.port, debug=args.debug)
 loop = asyncio.get_event_loop()
 task = asyncio.ensure_future(server)
 signal(SIGINT, lambda s, f: loop.stop())
+signal(SIGTERM, lambda s, f: loop.stop())
 try:
     app.is_running = True
     loop.run_forever()

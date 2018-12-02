@@ -10,15 +10,11 @@ from .. import app
 class TimerNode(object):
     """A simple timer node. Sends timing pings for the system to use."""
 
-    def __init__(self, base_topic, device_id, node_id, seconds):
+    def __init__(self, node_id, seconds):
         self.seconds = seconds
-        self.topic = '/'.join([
-            base_topic,
-            device_id,
-            node_id,
-            '_internal'])
+        self.topic = app.new_topic(node_id + '/_internal')
 
-        self.broker = mqtt_client.MQTTClient(device_id + '-' + node_id)
+        self.broker = mqtt_client.MQTTClient()
         asyncio.ensure_future(self._connect())
 
     async def _connect(self):

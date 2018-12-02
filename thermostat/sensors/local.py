@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 """Protocols for local sensors (e.g. GPIO)."""
 
+import datetime
+import asyncio
 import os
+import logging
 from random import randint
+import urllib.parse as urllib_parse
 
 import importlib.util
 try:
@@ -18,48 +22,90 @@ os.environ['W1THERMSENSOR_NO_KERNEL_MODULE'] = '1'
 from w1thermsensor import W1ThermSensor
 
 from . import BaseSensorHandler
-from .. import errors
+
+
+# TEST loggers
+log = logging.getLogger("root")
 
 
 class RandomSensorHandler(BaseSensorHandler):
     """A sensor handler that returns random values for various sensor types."""
 
-    def __init__(self, address):
-        BaseSensorHandler.__init__(self, address)
+    DEFAULT_INTERVAL = 60
 
-    def read(self, sensor_type):
-        if sensor_type == 'temperature':
-            return {
-                'value': randint(-10, 40),
-                'unit': 'celsius'
-            }
+    def __init__(self, sensor_id: str, address: str):
+        BaseSensorHandler.__init__(self, sensor_id, address)
+        params = urllib_parse.parse_qs(address)
+        self.last_temperature = None
+        if params and 'interval' in params:
+            self.interval = int(params['interval'][0])
         else:
-            raise errors.NotSupportedError('Only temperature is supported')
+            self.interval = self.DEFAULT_INTERVAL
+
+    def startup(self):
+        BaseSensorHandler.startup(self)
+
+    async def connected(self):
+        await self.timeout()
+        self.start_timer(self.interval)
+
+    async def timeout(self):
+        temp = randint(-10, 40)
+        if self.last_temperature is None or self.last_temperature != temp:
+            self.last_temperature = temp
+            await self.publish({
+                'value': self.last_temperature,
+                'unit': 'celsius',
+                'timestamp': datetime.datetime.now().isoformat(),
+            }, '/temperature', retain=True)
+            await self.publish({
+                'value': randint(5, 98),
+                'unit': 'percent',
+                'timestamp': datetime.datetime.now().isoformat(),
+            }, '/battery', retain=True)
 
 
 class GPIOW1SensorHandler(BaseSensorHandler):
     """Raspberry sensor handler that reads from GPIO using 1-Wire protocol."""
 
-    def __init__(self, address):
-        BaseSensorHandler.__init__(self, address)
+    DEFAULT_INTERVAL = 60
 
-    def read(self, sensor_type):
-        if sensor_type == 'temperature':
-            if fakeSensors:
-                # random temperature :D
-                temp = 23
-            else:
-                sensor = W1ThermSensor(sensor_id=self.address)
-                temp = sensor.get_temperature(unit=W1ThermSensor.DEGREES_C)
-
-            # round it up to the nearest half since it's all we are interested in
-            temp = round(temp * 2) / 2
-            return {
-                'value': temp,
-                'unit': 'celsius'
-            }
+    def __init__(self, sensor_id: str, address: str):
+        BaseSensorHandler.__init__(self, sensor_id, address)
+        params = urllib_parse.parse_qs(address)
+        self.last_temperature = None
+        if params and 'interval' in params:
+            self.interval = int(params['interval'][0])
         else:
-            raise errors.NotSupportedError('Only temperature is supported')
+            self.interval = self.DEFAULT_INTERVAL
+
+    def startup(self):
+        BaseSensorHandler.startup(self)
+
+    async def connected(self):
+        await self.timeout()
+        self.start_timer(self.interval)
+
+    async def timeout(self):
+        temp = await asyncio.get_event_loop().run_in_executor(None, self._read)
+        if self.last_temperature is None or self.last_temperature != temp:
+            self.last_temperature = temp
+            await self.publish({
+                'value': self.last_temperature,
+                'unit': 'celsius',
+                'timestamp': datetime.datetime.now().isoformat(),
+            }, '/temperature', retain=True)
+
+    def _read(self):
+        if fakeSensors:
+            # random temperature :D
+            temp = randint(-10, 40)
+        else:
+            sensor = W1ThermSensor(sensor_id=self.address)
+            temp = sensor.get_temperature(unit=W1ThermSensor.DEGREES_C)
+
+        # round it up to the nearest half since it's all we are interested in
+        return round(temp * 2) / 2
 
 
 schemes = {

@@ -7,7 +7,6 @@ from sqlalchemy import (
 from sqlalchemy.orm.exc import NoResultFound
 
 from . import Base
-from ..database import scoped_session
 
 
 class Sensor(Base):
@@ -34,7 +33,7 @@ class Sensor(Base):
 
     # Sensor attributes
     sensor_type = Column(String(20))
-    data_mode = Column(Integer(), default=DATA_MODE_ACTIVE)
+    data_mode = Column(Integer(), default=DATA_MODE_ACTIVE)  # deprecated?
 
     # Sensor status
     status = Column(Integer(), default=STATUS_UNKNOWN)
@@ -61,17 +60,6 @@ class Reading(Base):
     def __repr__(self):
         """ Show sensor object info. """
         return '<Reading: {}@{}>'.format(self.sensor_id, self.timestamp)
-
-
-def store_reading(myapp, sensor_id, sensor_type, timestamp, unit, value):
-    with scoped_session(myapp.database) as session:
-        reading = Reading()
-        reading.sensor_id = sensor_id
-        reading.sensor_type = sensor_type
-        reading.timestamp = timestamp
-        reading.unit = unit
-        reading.value = value
-        session.add(reading)
 
 
 def get_last_readings(session, modifier='-10 minutes', sensor_type=None):

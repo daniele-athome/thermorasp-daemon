@@ -7,11 +7,12 @@ from . import BaseSensorHandler
 from .. import errors
 
 
+# FIXME must be ported to the new API
 class HTTPSensorHandler(BaseSensorHandler):
     """A sensor handler that requests data to a HTTP endpoint."""
 
-    def __init__(self, address):
-        BaseSensorHandler.__init__(self, address)
+    def __init__(self, sensor_id: str, address: str):
+        BaseSensorHandler.__init__(self, sensor_id, address)
 
     def read(self, sensor_type):
         if sensor_type == 'temperature':
