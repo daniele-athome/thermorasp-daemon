@@ -345,12 +345,3 @@ async def init_backend(sanic, loop):
     app.backend = Backend(app)
     n = sdnotify.SystemdNotifier()
     n.notify("READY=1")
-
-
-"""
-@app.listener('before_server_stop')
-async def stop_all_tasks(sanic, loop):
-    await loop.shutdown_asyncgens()
-    _shutdown = asyncio.gather(*asyncio.Task.all_tasks(), loop=loop)
-    await _shutdown
-"""
