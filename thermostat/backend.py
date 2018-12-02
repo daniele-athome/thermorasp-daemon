@@ -169,7 +169,7 @@ class Backend(object):
                                     'timer', int(self.app.config['BACKEND_INTERVAL']))
 
         # connect to broker
-        asyncio.ensure_future(self._connect())
+        app.add_task(self._connect())
 
     async def _connect(self):
         await self.broker.connect(self.app.broker_url)

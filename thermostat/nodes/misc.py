@@ -23,7 +23,7 @@ class TimerNode(object):
 
     async def _connect(self):
         await self.broker.connect(app.broker_url)
-        await asyncio.ensure_future(self._loop())
+        await app.ensure_future(self._loop())
 
     async def _loop(self):
         while app.is_running:
