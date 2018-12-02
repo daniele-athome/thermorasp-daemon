@@ -16,9 +16,10 @@ log = logging.getLogger("root")
 class BaseSensorHandler(object):
     """Base interface for sensor handlers."""
 
-    def __init__(self, sensor_id: str, address: str):
+    def __init__(self, sensor_id: str, address: str, sensor_type: str):
         self.id = sensor_id
         self.address = address
+        self.type = sensor_type
         self.broker = mqtt_client.MQTTClient()
         self.is_running = False
         self.timer = None
@@ -73,7 +74,7 @@ class BaseSensorHandler(object):
         pass
 
 
-def get_sensor_handler(sensor_id: str, protocol: str, address: str) -> BaseSensorHandler:
+def get_sensor_handler(sensor_id: str, protocol: str, address: str, sensor_type: str) -> BaseSensorHandler:
     """Returns an appropriate sensor handler for the given protocol and address."""
     module = importlib.import_module('.'+protocol, __name__)
     if module:
@@ -82,4 +83,4 @@ def get_sensor_handler(sensor_id: str, protocol: str, address: str) -> BaseSenso
             scheme_part, address_part = address.split(':', 1)
             if scheme_part in schemes:
                 handler_class = schemes[scheme_part]
-                return handler_class(sensor_id, address_part)
+                return handler_class(sensor_id, address_part, sensor_type)

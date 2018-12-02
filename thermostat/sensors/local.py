@@ -31,10 +31,11 @@ log = logging.getLogger("root")
 class RandomSensorHandler(BaseSensorHandler):
     """A sensor handler that returns random values for various sensor types."""
 
+    protocol = 'RND'
     DEFAULT_INTERVAL = 60
 
-    def __init__(self, sensor_id: str, address: str):
-        BaseSensorHandler.__init__(self, sensor_id, address)
+    def __init__(self, sensor_id: str, address: str, sensor_type: str):
+        BaseSensorHandler.__init__(self, sensor_id, address, sensor_type)
         params = urllib_parse.parse_qs(address)
         self.last_temperature = None
         if params and 'interval' in params:
@@ -50,28 +51,30 @@ class RandomSensorHandler(BaseSensorHandler):
         self.start_timer(self.interval)
 
     async def timeout(self):
-        temp = randint(-10, 40)
-        if self.last_temperature is None or self.last_temperature != temp:
-            self.last_temperature = temp
-            await self.publish({
-                'value': self.last_temperature,
-                'unit': 'celsius',
-                'timestamp': datetime.datetime.now().isoformat(),
-            }, '/temperature', retain=True)
-            await self.publish({
-                'value': randint(5, 98),
-                'unit': 'percent',
-                'timestamp': datetime.datetime.now().isoformat(),
-            }, '/battery', retain=True)
+        if self.type == 'temperature':
+            temp = randint(-10, 40)
+            if self.last_temperature is None or self.last_temperature != temp:
+                self.last_temperature = temp
+                await self.publish({
+                    'value': self.last_temperature,
+                    'unit': 'celsius',
+                    'timestamp': datetime.datetime.now().isoformat(),
+                }, '/temperature', retain=True)
+        await self.publish({
+            'value': randint(5, 98),
+            'unit': 'percent',
+            'timestamp': datetime.datetime.now().isoformat(),
+        }, '/battery', retain=True)
 
 
 class GPIOW1SensorHandler(BaseSensorHandler):
     """Raspberry sensor handler that reads from GPIO using 1-Wire protocol."""
 
+    protocol = 'GPIOW1'
     DEFAULT_INTERVAL = 60
 
-    def __init__(self, sensor_id: str, address: str):
-        BaseSensorHandler.__init__(self, sensor_id, address)
+    def __init__(self, sensor_id: str, address: str, sensor_type: str):
+        BaseSensorHandler.__init__(self, sensor_id, address, sensor_type)
         params = urllib_parse.parse_qs(address)
         self.last_temperature = None
         if params and 'interval' in params:
@@ -87,14 +90,15 @@ class GPIOW1SensorHandler(BaseSensorHandler):
         self.start_timer(self.interval)
 
     async def timeout(self):
-        temp = await asyncio.get_event_loop().run_in_executor(None, self._read)
-        if self.last_temperature is None or self.last_temperature != temp:
-            self.last_temperature = temp
-            await self.publish({
-                'value': self.last_temperature,
-                'unit': 'celsius',
-                'timestamp': datetime.datetime.now().isoformat(),
-            }, '/temperature', retain=True)
+        if self.type == 'temperature':
+            temp = await asyncio.get_event_loop().run_in_executor(None, self._read)
+            if self.last_temperature is None or self.last_temperature != temp:
+                self.last_temperature = temp
+                await self.publish({
+                    'value': self.last_temperature,
+                    'unit': 'celsius',
+                    'timestamp': datetime.datetime.now().isoformat(),
+                }, '/temperature', retain=True)
 
     def _read(self):
         if fakeSensors:
@@ -109,6 +113,6 @@ class GPIOW1SensorHandler(BaseSensorHandler):
 
 
 schemes = {
-    'GPIOW1': GPIOW1SensorHandler,
-    'RND': RandomSensorHandler,
+    GPIOW1SensorHandler.protocol: GPIOW1SensorHandler,
+    RandomSensorHandler.protocol: RandomSensorHandler,
 }

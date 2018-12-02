@@ -39,7 +39,7 @@ async def register(request: Request):
 
     in_data = request.json
     app.backend.devices.register(in_data['id'], in_data['protocol'], in_data['address'], in_data['type'], in_data['name'])
-    return json({'id': in_data['id']})
+    return json({'id': in_data['id']}, 201)
 
 
 @app.post('/devices/unregister')
