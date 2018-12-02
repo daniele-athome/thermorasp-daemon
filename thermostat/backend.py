@@ -162,14 +162,13 @@ class Backend(object):
         self.broker = mqtt_client.MQTTClient(str(self.app.config['DEVICE_ID']) + '-backend')
         self.timer = None
 
-    def setup(self):
         # start the timer node
         from .nodes import misc
         self.timer = misc.TimerNode(self.app.config['BROKER_TOPIC'], self.app.config['DEVICE_ID'],
                                     'timer', int(self.app.config['BACKEND_INTERVAL']))
 
         # connect to broker
-        app.add_task(self._connect())
+        asyncio.ensure_future(self._connect())
 
     async def _connect(self):
         await self.broker.connect(self.app.broker_url)
@@ -344,18 +343,14 @@ class Backend(object):
 @app.listener('before_server_start')
 async def init_backend(sanic, loop):
     app.backend = Backend(app)
-
-
-# noinspection PyUnusedLocal
-@app.listener('after_server_start')
-async def notify_systemd(sanic, loop):
-    app.backend.setup()
     n = sdnotify.SystemdNotifier()
     n.notify("READY=1")
 
 
+"""
 @app.listener('before_server_stop')
 async def stop_all_tasks(sanic, loop):
     await loop.shutdown_asyncgens()
     _shutdown = asyncio.gather(*asyncio.Task.all_tasks(), loop=loop)
     await _shutdown
+"""

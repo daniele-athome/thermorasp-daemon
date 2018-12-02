@@ -2,8 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+from asyncio import CancelledError
+
 import uvloop
 
+from signal import signal, SIGINT
 from argparse import ArgumentParser
 
 from thermostat import app, database
@@ -19,6 +22,24 @@ app.config.from_pyfile(args.config)
 app.database = database.init(app.config['DATABASE_URL'])
 app.broker_url = 'mqtt://' + app.config['BROKER_HOST'] + ':' + str(app.config['BROKER_PORT']) + '/'
 
-loop = uvloop.new_event_loop()
-asyncio.set_event_loop(loop)
-app.run(host=args.host, port=args.port, workers=1, debug=args.debug, loop=loop)
+asyncio.set_event_loop(uvloop.new_event_loop())
+
+server = app.create_server(host=args.host, port=args.port, debug=args.debug)
+loop = asyncio.get_event_loop()
+task = asyncio.ensure_future(server)
+signal(SIGINT, lambda s, f: loop.stop())
+try:
+    app.is_running = True
+    loop.run_forever()
+except:
+    loop.stop()
+finally:
+    app.is_running = False
+    for task in asyncio.Task.all_tasks():
+        task.cancel()
+    _shutdown = asyncio.gather(*asyncio.Task.all_tasks(), loop=loop)
+    try:
+        loop.run_until_complete(_shutdown)
+    except CancelledError:
+        pass
+    loop.close()

@@ -19,11 +19,11 @@ class TimerNode(object):
             '_internal'])
 
         self.broker = mqtt_client.MQTTClient(device_id + '-' + node_id)
-        app.add_task(self._connect())
+        asyncio.ensure_future(self._connect())
 
     async def _connect(self):
         await self.broker.connect(app.broker_url)
-        await app.ensure_future(self._loop())
+        await asyncio.ensure_future(self._loop())
 
     async def _loop(self):
         while app.is_running:
