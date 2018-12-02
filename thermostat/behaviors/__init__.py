@@ -11,13 +11,16 @@ class BehaviorContext(object):
     such as instances of sensors (to get readings) and devices (to control them).
     """
 
-    def __init__(self, devices, last_reading=None):
+    def __init__(self, event_logger, devices, last_reading=None):
         """
+        :param event_logger: the event logger instance
+        :type event_logger: EventLogger
         :param devices: a dictionary of all registered devices related to the active pipeline
         :type devices: dict
         :param last_reading: a dictionary of the last reading from each sensor type. '_avg' will have an average of all.
         :type last_reading: dict
         """
+        self.event_logger = event_logger
         self.devices = devices
         self.last_reading = last_reading
         self.delete = False

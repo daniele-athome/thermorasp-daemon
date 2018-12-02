@@ -89,7 +89,7 @@ def thermostat_control(log_source, context, device_id, target_temperature, cooli
     context.params['target_device'] = device_id
 
     if 'temperature' not in context.last_reading:
-        eventlog.event(eventlog.LEVEL_WARNING, log_source, 'action', 'last reading: (none), unable to proceed')
+        context.event_logger.event(eventlog.LEVEL_WARNING, log_source, 'action', 'last reading: (none), unable to proceed')
         return False
 
     target_device = context.devices[device_id]
@@ -99,7 +99,8 @@ def thermostat_control(log_source, context, device_id, target_temperature, cooli
         enabled = last_reading > target_temperature
     else:
         enabled = last_reading < target_temperature
-    eventlog.event(eventlog.LEVEL_INFO, log_source, 'behavior:action', 'last reading: {}, target: {}, enabled: {}'
-                   .format(last_reading, target_temperature, enabled))
+    context.event_logger.event(eventlog.LEVEL_INFO, log_source, 'behavior:action',
+                               'last reading: {}, target: {}, enabled: {}'
+                               .format(last_reading, target_temperature, enabled))
     target_device.control(enabled=enabled)
     return True

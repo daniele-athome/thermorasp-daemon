@@ -16,7 +16,8 @@ parser.add_argument('-d', '--debug', action='store_true', help='enable debug')
 args = parser.parse_args()
 
 app.config.from_pyfile(args.config)
-app.database = database.init(app.config)
+app.database = database.init(app.config['DATABASE_URL'])
+app.broker_url = 'mqtt://' + app.config['BROKER_HOST'] + ':' + str(app.config['BROKER_PORT']) + '/'
 
 loop = uvloop.new_event_loop()
 asyncio.set_event_loop(loop)

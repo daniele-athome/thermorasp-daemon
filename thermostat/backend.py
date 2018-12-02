@@ -14,7 +14,7 @@ import hbmqtt.client as mqtt_client
 
 from .database import scoped_session
 from . import app, devices
-from .models import Sensor, Pipeline, Reading, Device
+from .models import Sensor, Pipeline, Device, EventLog
 from .models.sensors import store_reading, get_last_readings
 from .models import eventlog
 from .sensors import get_sensor_handler
@@ -23,6 +23,28 @@ from .behaviors import BehaviorContext, get_behavior_handler
 
 # TEST loggers
 log = logging.getLogger("root")
+
+
+class EventLogger(object):
+    def __init__(self, database):
+        self.database = database
+
+    def event(self, level, source, name, description=None):
+        with scoped_session(self.database) as session:
+            vevent = EventLog()
+            vevent.timestamp = datetime.datetime.now()
+            vevent.level = level
+            vevent.source = source
+            vevent.name = name
+            vevent.description = description
+            session.add(vevent)
+
+    def event_exc(self, level, source, name):
+        import traceback
+        e_type, e_value, e_tb = sys.exc_info()
+        strerr1 = traceback.format_exception_only(e_type, e_value)[0][:-1]
+        strerr = ''.join(traceback.format_exception(e_type, e_value, e_tb))
+        self.event(level, source, name, strerr1 + "\n" + strerr)
 
 
 class OperatingPipeline(object):
@@ -55,8 +77,8 @@ class OperatingPipeline(object):
         self.chain = [get_behavior_handler(behavior['id'], behavior['config'])
                       for behavior in self.pipeline['behaviors']]
 
-    def set_context(self, active_devices, last_reading):
-        self.context = BehaviorContext(active_devices, last_reading)
+    def set_context(self, event_logger, active_devices, last_reading):
+        self.context = BehaviorContext(event_logger, active_devices, last_reading)
 
     def run(self):
         for idx, behavior in enumerate(list(self.chain)):
@@ -84,7 +106,7 @@ class DeviceManager(object):
         return self.devices.values()
 
     def _init(self):
-        with scoped_session(app.database) as session:
+        with scoped_session(self.database) as session:
             stmt = Device.__table__.select()
             for d in session.execute(stmt):
                 self._register(d['id'], d['device_type'], d['protocol'], d['address'], d['name'])
@@ -131,25 +153,33 @@ class Backend(object):
     def __init__(self, myapp):
         self.app = myapp
         self.devices = DeviceManager(self.app.database)
+        self.event_logger = EventLogger(self.app.database)
         # the operating (active) pipeline
         self.pipeline = None
         self.pipeline_lock = asyncio.Lock()
         # sensor futures
         self.sensor_tasks = {}
+        self.broker = mqtt_client.MQTTClient(str(self.app.config['DEVICE_ID']) + '-backend')
+        self.timer = None
+
+    def setup(self):
+        # start the timer node
+        from .nodes import misc
+        self.timer = misc.TimerNode(self.app.config['BROKER_TOPIC'], self.app.config['DEVICE_ID'],
+                                    'timer', int(self.app.config['BACKEND_INTERVAL']))
 
         # connect to broker
-        self.broker = mqtt_client.MQTTClient(str(self.app.config['DEVICE_ID']) + '-backend')
-        self.app.add_task(self._connect())
+        asyncio.ensure_future(self._connect())
 
     async def _connect(self):
         await self.broker.connect(self.app.broker_url)
         log.debug("Backend is connected to broker")
-        await self.broker.subscribe([(self.app.timer.topic, mqtt_client.QOS_0)])
+        await self.broker.subscribe([(self.timer.topic, mqtt_client.QOS_0)])
         await self.backend()
         while self.app.is_running:
             message = await self.broker.deliver_message()
             log.debug("BROKER topic={}, payload={}".format(message.topic, message.data))
-            if message.topic == self.app.timer.topic:
+            if message.topic == self.timer.topic:
                 if message.data == b'timer':
                     await self.backend()
 
@@ -159,7 +189,7 @@ class Backend(object):
             await self.backend_ops()
         except:
             log.error('Unexpected error:', exc_info=sys.exc_info())
-            eventlog.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
+            self.event_logger.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
 
     async def sensors(self):
         while self.app.is_running:
@@ -169,7 +199,7 @@ class Backend(object):
                 self.sensors_ops()
             except:
                 log.error('Unexpected error:', exc_info=sys.exc_info())
-                eventlog.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
+                self.event_logger.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
 
             await asyncio.sleep(self.app.config['SENSORS_INTERVAL'])
 
@@ -188,7 +218,7 @@ class Backend(object):
                 pipelines = self.get_enabled_pipelines()
                 if len(pipelines) > 0:
                     if len(pipelines) > 1:
-                        eventlog.event(eventlog.LEVEL_WARNING, 'backend', 'configuration',
+                        self.event_logger.event(eventlog.LEVEL_WARNING, 'backend', 'configuration',
                                        "Multiple pipelines active. We'll take the first one")
 
                     # take only the first one
@@ -197,7 +227,7 @@ class Backend(object):
                     self.pipeline = OperatingPipeline(pipeline)
 
             if self.pipeline:
-                self.pipeline.set_context(self.devices, self.get_last_readings())
+                self.pipeline.set_context(self.event_logger, self.devices, self.get_last_readings())
                 self.pipeline.run()
 
     async def update_operating_pipeline(self, behaviors):
@@ -205,7 +235,7 @@ class Backend(object):
         with await self.pipeline_lock:
             if self.pipeline:
                 self.pipeline.update(behaviors)
-                self.pipeline.set_context(self.devices, self.get_last_readings())
+                self.pipeline.set_context(self.event_logger, self.devices, self.get_last_readings())
                 self.pipeline.run()
 
     async def update_operating_behavior(self, behavior_order, config):
@@ -213,7 +243,7 @@ class Backend(object):
         with await self.pipeline_lock:
             if self.pipeline:
                 self.pipeline.update_config(behavior_order, config)
-                self.pipeline.set_context(self.devices, self.get_last_readings())
+                self.pipeline.set_context(self.event_logger, self.devices, self.get_last_readings())
                 self.pipeline.run()
 
     async def set_operating_pipeline(self, pipeline_id):
@@ -225,7 +255,7 @@ class Backend(object):
                 if pipeline:
                     log.debug("Activating pipeline #{} - {}".format(pipeline['id'], pipeline['name']))
                     self.pipeline = OperatingPipeline(pipeline)
-                    self.pipeline.set_context(self.devices, self.get_last_readings())
+                    self.pipeline.set_context(self.event_logger, self.devices, self.get_last_readings())
                     self.pipeline.run()
 
     def get_last_readings(self, modifier='-10 minutes'):
@@ -305,7 +335,7 @@ class Backend(object):
             store_reading(self.app, sensor_info['id'], sensor_type,
                           datetime.datetime.now(), reading['unit'], reading['value'])
         except ValueError:
-            eventlog.event_exc(eventlog.LEVEL_WARNING, 'sensor', 'exception')
+            self.event_logger.event_exc(eventlog.LEVEL_WARNING, 'sensor', 'exception')
         finally:
             del self.sensor_tasks[sensor_info['id']]
 
@@ -313,30 +343,13 @@ class Backend(object):
 # noinspection PyUnusedLocal
 @app.listener('before_server_start')
 async def init_backend(sanic, loop):
-    """
-    app.device = homie.Device({
-        'HOST': app.config['BROKER_HOST'],
-        'PORT': app.config['BROKER_PORT'],
-        'TOPIC': app.config['BROKER_TOPIC'],
-        'KEEPALIVE': 60,
-        'DEVICE_ID': str(app.config['DEVICE_ID']),
-        'DEVICE_NAME': app.config['DEVICE_NAME'],
-    })
-    """
-    app.broker_url = 'mqtt://' + app.config['BROKER_HOST'] + ':' + str(app.config['BROKER_PORT']) + '/'
-
-    # start the timer node
-    from .nodes import misc
-    app.timer = misc.TimerNode(app, app.config['BROKER_TOPIC'], app.config['DEVICE_ID'],
-                               'timer', app.config['BACKEND_INTERVAL'])
-
     app.backend = Backend(app)
-    #asyncio.ensure_future(app.backend.sensors(), loop=loop)
 
 
 # noinspection PyUnusedLocal
 @app.listener('after_server_start')
 async def notify_systemd(sanic, loop):
+    app.backend.setup()
     n = sdnotify.SystemdNotifier()
     n.notify("READY=1")
 
@@ -344,7 +357,5 @@ async def notify_systemd(sanic, loop):
 @app.listener('before_server_stop')
 async def stop_all_tasks(sanic, loop):
     await loop.shutdown_asyncgens()
-    #for task in asyncio.Task.all_tasks():
-    #    task.cancel()
     _shutdown = asyncio.gather(*asyncio.Task.all_tasks(), loop=loop)
     await _shutdown
