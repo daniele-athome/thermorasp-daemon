@@ -16,7 +16,6 @@ from dateutil.parser import parse as parse_date
 from .database import scoped_session
 from . import app, devices
 from .models import Sensor, Pipeline, Device, Reading, EventLog
-from .models.sensors import get_last_readings
 from .models import eventlog
 from .sensors import get_sensor_handler
 from .behaviors import BehaviorContext, get_behavior_handler
@@ -153,6 +152,8 @@ class SensorManager(object):
     def __init__(self, database, broker: mqtt_client.MQTTClient):
         self.database = database
         self.broker = None
+        # sensor_type: {_avg: {...}, sensor_id: {...}, sensor_id: {...}}
+        self.readings = {}
         self.sensors = {}
         # subscription futures
         self.sensors_subs = {}
@@ -203,9 +204,25 @@ class SensorManager(object):
                 topic = message.topic.split('/')
                 sensor_type = topic[-1]
                 data = json.loads(message.data.decode('utf-8'))
+                reading_timestamp = parse_date(data['timestamp'])
                 # store reading in database
                 self.store_reading(sensor_instance.id, sensor_type,
-                                   parse_date(data['timestamp']), data['unit'], data['value'])
+                                   reading_timestamp, data['unit'], data['value'])
+                # store reading in cache
+                cache = self._reading_cache(sensor_type)
+                cache[sensor_instance.id] = {
+                    'timestamp': reading_timestamp,
+                    'unit': data['unit'],
+                    'value': float(data['value']),
+                }
+                # recalculate average
+                all_values = [v['value'] if k != '_avg' else 0 for k, v in cache.items()]
+                cache['_avg'] = {'value': sum(all_values) / len(all_values)}
+
+    def _reading_cache(self, sensor_type):
+        if sensor_type not in self.readings:
+            self.readings[sensor_type] = {}
+        return self.readings[sensor_type]
 
     def store_reading(self, sensor_id, sensor_type, timestamp, unit, value):
         with scoped_session(self.database) as session:
@@ -240,27 +257,7 @@ class SensorManager(object):
 
     def get_last_readings(self, sensor_type='temperature'):
         """Returns a dict with the last readings from all sensors."""
-        with scoped_session(self.database) as session:
-            rds = get_last_readings(session, modifier)
-
-            last = {}
-            for reading in rds:
-                if reading.sensor_type not in last:
-                    last[reading.sensor_type] = {}
-                last[reading.sensor_type][reading.sensor_id] = {
-                    'timestamp': reading.timestamp,
-                    'unit': reading.unit,
-                    'value': float(reading.value),
-                }
-
-            # compute averages for temperature
-            # TODO account for different units
-            for sensor_type, values in last.items():
-                if sensor_type == 'temperature':
-                    all_values = [v['value'] for k, v in values.items()]
-                    values['_avg'] = {'value': sum(all_values) / len(all_values)}
-
-            return last
+        return self._reading_cache(sensor_type)
 
 
 class Backend(object):
@@ -323,7 +320,7 @@ class Backend(object):
                     self.pipeline = OperatingPipeline(pipeline)
 
             if self.pipeline:
-                self.pipeline.set_context(self.event_logger, self.devices, self.get_last_readings())
+                self.pipeline.set_context(self.event_logger, self.devices, self.sensors.get_last_readings())
                 self.pipeline.run()
 
     async def update_operating_pipeline(self, behaviors):
@@ -331,7 +328,7 @@ class Backend(object):
         with await self.pipeline_lock:
             if self.pipeline:
                 self.pipeline.update(behaviors)
-                self.pipeline.set_context(self.event_logger, self.devices, self.get_last_readings())
+                self.pipeline.set_context(self.event_logger, self.devices, self.sensors.get_last_readings())
                 self.pipeline.run()
 
     async def update_operating_behavior(self, behavior_order, config):
@@ -339,7 +336,7 @@ class Backend(object):
         with await self.pipeline_lock:
             if self.pipeline:
                 self.pipeline.update_config(behavior_order, config)
-                self.pipeline.set_context(self.event_logger, self.devices, self.get_last_readings())
+                self.pipeline.set_context(self.event_logger, self.devices, self.sensors.get_last_readings())
                 self.pipeline.run()
 
     async def set_operating_pipeline(self, pipeline_id):
@@ -351,32 +348,8 @@ class Backend(object):
                 if pipeline:
                     log.debug("Activating pipeline #{} - {}".format(pipeline['id'], pipeline['name']))
                     self.pipeline = OperatingPipeline(pipeline)
-                    self.pipeline.set_context(self.event_logger, self.devices, self.get_last_readings())
+                    self.pipeline.set_context(self.event_logger, self.devices, self.sensors.get_last_readings())
                     self.pipeline.run()
-
-    def get_last_readings(self, modifier='-10 minutes'):
-        """Returns a dict with the last readings from all sensors."""
-        with scoped_session(self.app.database) as session:
-            rds = get_last_readings(session, modifier)
-
-            last = {}
-            for reading in rds:
-                if reading.sensor_type not in last:
-                    last[reading.sensor_type] = {}
-                last[reading.sensor_type][reading.sensor_id] = {
-                    'timestamp': reading.timestamp,
-                    'unit': reading.unit,
-                    'value': float(reading.value),
-                }
-
-            # compute averages for temperature
-            # TODO account for different units
-            for sensor_type, values in last.items():
-                if sensor_type == 'temperature':
-                    all_values = [v['value'] for k, v in values.items()]
-                    values['_avg'] = {'value': sum(all_values) / len(all_values)}
-
-            return last
 
     def get_passive_sensors(self):
         with scoped_session(self.app.database) as session:
