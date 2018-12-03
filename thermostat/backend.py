@@ -23,6 +23,26 @@ from .behaviors import BehaviorContext, get_behavior_handler
 log = logging.getLogger("root")
 
 
+class TimerNode(object):
+    """A simple timer node. Sends timing pings for the system to use."""
+
+    def __init__(self, node_id, seconds):
+        self.seconds = seconds
+        self.topic = app.new_topic(node_id + '/_internal')
+
+        self.broker = mqtt_client.MQTTClient()
+        asyncio.ensure_future(self._connect())
+
+    async def _connect(self):
+        await self.broker.connect(app.broker_url)
+        await asyncio.ensure_future(self._loop())
+
+    async def _loop(self):
+        while app.is_running:
+            await asyncio.sleep(self.seconds)
+            await self.broker.publish(self.topic, b'timer', retain=False)
+
+
 class EventLogger(object):
     def __init__(self, database):
         self.database = database
@@ -160,8 +180,7 @@ class Backend(object):
         self.timer = None
 
         # start the timer node
-        from .nodes import misc
-        self.timer = misc.TimerNode('timer', int(self.app.config['BACKEND_INTERVAL']))
+        self.timer = TimerNode('timer', int(self.app.config['BACKEND_INTERVAL']))
 
         # connect to broker
         asyncio.ensure_future(self._connect())
