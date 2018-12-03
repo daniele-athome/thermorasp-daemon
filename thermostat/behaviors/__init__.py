@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 """Smart automation behaviors."""
 
+import logging
 import importlib
+
+# TEST loggers
+log = logging.getLogger("root")
 
 
 class BehaviorContext(object):
@@ -47,14 +51,25 @@ class BaseBehavior(object):
         """Returns the configuration schema for this behavior."""
         raise NotImplementedError()
 
-    def execute(self, context):
-        """
-        This is the behavior main execution function.
-        :param context: an instance of BehaviorContext
-        :type context: BehaviorContext
-        :return True to go on with the chain, False to block processing
-        """
+    def startup(self):
+        """Called when the behavior is started."""
         raise NotImplementedError()
+
+    def shutdown(self):
+        """Called when the behavior is stopped."""
+        raise NotImplementedError()
+
+    def sensor_data(self, todo):  # TODO
+        """Called when a sensor has new data."""
+        pass
+
+    def device_state(self, todo):  # TODO
+        """Called when a device changes its state."""
+        pass
+
+    def timer(self):
+        """Called when the timer ticks."""
+        pass
 
 
 def get_behavior_handler_class(behavior_id: str):

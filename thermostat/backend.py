@@ -13,10 +13,9 @@ from sqlalchemy.orm.exc import NoResultFound
 import hbmqtt.client as mqtt_client
 
 from .database import scoped_session
-from . import app, devices, sensorman
-from .models import Sensor, Pipeline, Device, EventLog
+from . import app, devices, sensorman, opschedule
+from .models import Sensor, Device, EventLog, Schedule
 from .models import eventlog
-from .behaviors import BehaviorContext, get_behavior_handler
 
 
 # TEST loggers
@@ -63,51 +62,6 @@ class EventLogger(object):
         strerr1 = traceback.format_exception_only(e_type, e_value)[0][:-1]
         strerr = ''.join(traceback.format_exception(e_type, e_value, e_tb))
         self.event(level, source, name, strerr1 + "\n" + strerr)
-
-
-class OperatingPipeline(object):
-    """Manages a pipeline lifecycle."""
-
-    def __init__(self, pipeline):
-        self.pipeline = pipeline
-        self.context = None
-        self.chain = None
-        self._reload_chain()
-
-    def __getattr__(self, item):
-        if item in self.pipeline:
-            return self.pipeline[item]
-        else:
-            return object.__getattribute__(self, item)
-
-    def update(self, behaviors):
-        self.pipeline['behaviors'] = behaviors
-        self._reload_chain()
-
-    def update_config(self, behavior_order, config):
-        for behavior in self.pipeline['behaviors']:
-            if behavior['order'] == behavior_order:
-                behavior['config'] = config
-                self._reload_chain()
-                break
-
-    def _reload_chain(self):
-        self.chain = [get_behavior_handler(behavior['id'], behavior['config'])
-                      for behavior in self.pipeline['behaviors']]
-
-    def set_context(self, event_logger, active_devices, last_reading):
-        self.context = BehaviorContext(event_logger, active_devices, last_reading)
-
-    def run(self):
-        for idx, behavior in enumerate(list(self.chain)):
-            ret = behavior.execute(self.context)
-            if self.context.delete:
-                # behavior requested to be removed
-                del self.pipeline['behaviors'][idx]
-                self._reload_chain()
-                self.context.delete = False
-            if not ret:
-                break
 
 
 class DeviceManager(object):
@@ -174,9 +128,9 @@ class Backend(object):
         self.devices = DeviceManager(self.app.database)
         self.event_logger = EventLogger(self.app.database)
         self.broker = mqtt_client.MQTTClient()
-        # the operating (active) pipeline
-        self.pipeline = None
-        self.pipeline_lock = asyncio.Lock()
+        # the operating (active) schedule
+        self.schedule = None
+        self.schedule_lock = asyncio.Lock()
         self.timer = None
 
         # start the timer node
@@ -208,24 +162,25 @@ class Backend(object):
     async def backend_ops(self):
         """All backend cycle operations are here."""
 
-        with await self.pipeline_lock:
-            if self.pipeline is None:
-                # read pipelines config (first run)
-                pipelines = self.get_enabled_pipelines()
-                if len(pipelines) > 0:
-                    if len(pipelines) > 1:
+        with await self.schedule_lock:
+            if self.schedule is None:
+                # read schedules config (first run)
+                schedules = self.get_enabled_schedules()
+                if len(schedules) > 0:
+                    if len(schedules) > 1:
                         self.event_logger.event(eventlog.LEVEL_WARNING, 'backend', 'configuration',
-                                       "Multiple pipelines active. We'll take the first one")
+                                                "Multiple schedules active. We'll take the first one")
 
                     # take only the first one
-                    pipeline = pipelines[0]
-                    log.debug("Activating pipeline #{} - {}".format(pipeline['id'], pipeline['name']))
-                    self.pipeline = OperatingPipeline(pipeline)
+                    schedule = schedules[0]
+                    log.debug("Activating schedule #{} - {}".format(schedule['id'], schedule['name']))
+                    self.schedule = opschedule.OperatingSchedule(self.sensors, schedule)
+                    await self.schedule.startup()
 
-            if self.pipeline:
-                self.pipeline.set_context(self.event_logger, self.devices, self.sensors.get_last_readings_summary())
-                self.pipeline.run()
+            if self.schedule:
+                await self.schedule.timer()
 
+    # TODO
     async def update_operating_pipeline(self, behaviors):
         """Updates the current operating pipeline instance with new behaviors. Used for temporary alterations."""
         with await self.pipeline_lock:
@@ -234,6 +189,7 @@ class Backend(object):
                 self.pipeline.set_context(self.event_logger, self.devices, self.sensors.get_last_readings_summary())
                 self.pipeline.run()
 
+    # TODO
     async def update_operating_behavior(self, behavior_order, config):
         """Updates the configuration of a behavior in the current operating pipeline Used for temporary alterations."""
         with await self.pipeline_lock:
@@ -242,47 +198,56 @@ class Backend(object):
                 self.pipeline.set_context(self.event_logger, self.devices, self.sensors.get_last_readings_summary())
                 self.pipeline.run()
 
-    async def set_operating_pipeline(self, pipeline_id):
-        with await self.pipeline_lock:
-            if pipeline_id is None:
-                self.pipeline = None
+    async def set_operating_schedule(self, schedule_id):
+        with await self.schedule_lock:
+            if schedule_id is None:
+                self.cancel_current_schedule()
             else:
-                pipeline = self.get_pipeline(pipeline_id)
-                if pipeline:
-                    log.debug("Activating pipeline #{} - {}".format(pipeline['id'], pipeline['name']))
-                    self.pipeline = OperatingPipeline(pipeline)
-                    self.pipeline.set_context(self.event_logger, self.devices, self.sensors.get_last_readings_summary())
-                    self.pipeline.run()
+                schedule = self.get_schedule(schedule_id)
+                if schedule:
+                    log.debug("Activating schedule #{} - {}".format(schedule['id'], schedule['name']))
+                    self.schedule = opschedule.OperatingSchedule(self.sensors, schedule)
+                    await self.schedule.startup()
+
+    def cancel_current_schedule(self):
+        if self.schedule:
+            self.schedule.shutdown()
+            self.schedule = None
 
     def get_passive_sensors(self):
         with scoped_session(self.app.database) as session:
             stmt = Sensor.__table__.select().where(Sensor.data_mode == Sensor.DATA_MODE_PASSIVE)
             return [dict(s) for s in session.execute(stmt)]
 
-    def get_enabled_pipelines(self):
+    def get_enabled_schedules(self):
         with scoped_session(self.app.database) as session:
-            return [self._pipeline_model(p) for p in session.query(Pipeline)
-                    .filter(Pipeline.enabled == 1)
-                    .order_by(Pipeline.id)
+            return [self._schedule_model(s) for s in session.query(Schedule)
+                    .filter(Schedule.enabled == 1)
+                    .order_by(Schedule.id)
                     .all()]
 
-    def get_pipeline(self, pipeline_id):
+    def get_schedule(self, schedule_id):
         with scoped_session(self.app.database) as session:
-            return self._pipeline_model(session.query(Pipeline)
-                                        .filter(Pipeline.id == pipeline_id)
+            return self._schedule_model(session.query(Schedule)
+                                        .filter(Schedule.id == schedule_id)
                                         .one())
 
     @staticmethod
-    def _pipeline_model(p):
+    def _schedule_model(s: Schedule):
         return {
-            'id': p.id,
-            'name': p.name,
-            'description': p.description,
+            'id': s.id,
+            'name': s.name,
+            'description': s.description,
             'behaviors': [{
-                'id': b.behavior_id,
+                'id': b.id,
+                'name': b.behavior_name,
                 'order': b.behavior_order,
+                'start_time': b.start_time,
+                'end_time': b.end_time,
                 'config': json.loads(b.config),
-            } for b in p.behaviors]
+                'sensors': [],  # TODO
+                'devices': [],  # TODO
+            } for b in s.behaviors]
         }
 
     def get_enabled_sensors(self):
