@@ -1,15 +1,26 @@
 # -*- coding: utf-8 -*-
 """General purpose behaviors."""
 
+import logging
+import hbmqtt.client as mqtt_client
+
 from . import BaseBehavior
 from ..models import eventlog
+
+
+# TEST loggers
+log = logging.getLogger("root")
 
 
 class TargetTemperatureBehavior(BaseBehavior):
     """A base behavior for setting a target temperature."""
 
-    def __init__(self, behavior_id, config=None):
-        BaseBehavior.__init__(self, behavior_id, config)
+    def __init__(self, behavior_id: int, name: str, broker: mqtt_client.MQTTClient):
+        BaseBehavior.__init__(self, behavior_id, name, broker)
+        self.cooling = None
+        self.target_temperature = None
+
+    def _init(self, config):
         self.cooling = 'mode' in config and config['mode'] == 'cooling'
         self.target_temperature = config['target_temperature']
 
@@ -31,11 +42,20 @@ class TargetTemperatureBehavior(BaseBehavior):
             },
         }
 
-    def startup(self):
+    async def startup(self, config):
+        self._init(config)
+
+    async def shutdown(self):
         pass
 
-    def shutdown(self):
-        pass
+    async def update(self, config):
+        self._init(config)
+
+    async def sensor_data(self, topic: str, data: dict):
+        log.debug("TARGET got sensor data from {}: {}".format(topic, data))
+
+    async def device_state(self, topic: str, data: dict):
+        log.debug("TARGET got device state from {}: {}".format(topic, data))
 
 
 def thermostat_control(log_source, context, device_id, target_temperature, cooling=True):

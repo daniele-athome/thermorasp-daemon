@@ -8,13 +8,11 @@ import datetime
 import sdnotify
 import json
 
-from sqlalchemy.orm.exc import NoResultFound
-
 import hbmqtt.client as mqtt_client
 
 from .database import scoped_session
-from . import app, devices, sensorman, opschedule
-from .models import Sensor, Device, EventLog, Schedule
+from . import app, sensorman, deviceman, opschedule
+from .models import Sensor, EventLog, Schedule
 from .models import eventlog
 
 
@@ -64,68 +62,13 @@ class EventLogger(object):
         self.event(level, source, name, strerr1 + "\n" + strerr)
 
 
-class DeviceManager(object):
-
-    def __init__(self, database):
-        self.database = database
-        self.devices = {}
-        self._init()
-
-    def __getitem__(self, item):
-        return self.devices[item]
-
-    def values(self):
-        return self.devices.values()
-
-    def _init(self):
-        with scoped_session(self.database) as session:
-            stmt = Device.__table__.select()
-            for d in session.execute(stmt):
-                self._register(d['id'], d['device_type'], d['protocol'], d['address'], d['name'])
-
-    def _register(self, device_id, device_type, protocol, address, name):
-        """Creates a new device and stores the instance in the internal collection."""
-        if device_id in self.devices:
-            self._unregister(device_id)
-
-        dev_instance = devices.get_device_handler(device_id, device_type, protocol, address, name)
-        self.devices[device_id] = dev_instance
-        dev_instance.startup()
-
-    def _unregister(self, device_id):
-        self.devices[device_id].shutdown()
-        del self.devices[device_id]
-
-    def register(self, device_id, protocol, address, device_type, name):
-        with scoped_session(self.database) as session:
-            device = Device()
-            device.id = device_id
-            device.name = name
-            device.protocol = protocol
-            device.address = address
-            device.device_type = device_type
-            device = session.merge(device)
-            # will also unregister old device if any
-            self._register(device.id, device.device_type, device.protocol, device.address, device.name)
-
-    def unregister(self, device_id):
-        try:
-            self._unregister(device_id)
-            with scoped_session(self.database) as session:
-                device = session.query(Device).filter(Device.id == device_id).one()
-                session.delete(device)
-            return True
-        except (NoResultFound, KeyError):
-            return False
-
-
 class Backend(object):
     """The backend operations thread."""
 
     def __init__(self, myapp):
         self.app = myapp
         self.sensors = sensorman.SensorManager(self.app.database)
-        self.devices = DeviceManager(self.app.database)
+        self.devices = deviceman.DeviceManager(self.app.database)
         self.event_logger = EventLogger(self.app.database)
         self.broker = mqtt_client.MQTTClient()
         # the operating (active) schedule
@@ -174,7 +117,7 @@ class Backend(object):
                     # take only the first one
                     schedule = schedules[0]
                     log.debug("Activating schedule #{} - {}".format(schedule['id'], schedule['name']))
-                    self.schedule = opschedule.OperatingSchedule(self.sensors, schedule)
+                    self.schedule = opschedule.OperatingSchedule(self.sensors, self.devices, schedule)
                     await self.schedule.startup()
 
             if self.schedule:
@@ -206,7 +149,7 @@ class Backend(object):
                 schedule = self.get_schedule(schedule_id)
                 if schedule:
                     log.debug("Activating schedule #{} - {}".format(schedule['id'], schedule['name']))
-                    self.schedule = opschedule.OperatingSchedule(self.sensors, schedule)
+                    self.schedule = opschedule.OperatingSchedule(self.sensors, self.devices, schedule)
                     await self.schedule.startup()
 
     def cancel_current_schedule(self):
@@ -245,8 +188,8 @@ class Backend(object):
                 'start_time': b.start_time,
                 'end_time': b.end_time,
                 'config': json.loads(b.config),
-                'sensors': [],  # TODO
-                'devices': [],  # TODO
+                'sensors': [sens.sensor_id for sens in b.sensors],
+                'devices': [dev.device_id for dev in b.devices],
             } for b in s.behaviors]
         }
 

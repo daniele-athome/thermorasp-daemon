@@ -42,6 +42,9 @@ class Behavior(Base):
     end_time = Column(SmallInteger())
     config = Column(String(500), default='{}', server_default='{}')
 
+    sensors = relationship("BehaviorSensors", cascade="all, delete-orphan")
+    devices = relationship("BehaviorDevices", cascade="all, delete-orphan")
+
     # Methods
     def __repr__(self):
         """ Show behavior object info. """

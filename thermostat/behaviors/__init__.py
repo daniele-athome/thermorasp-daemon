@@ -3,6 +3,7 @@
 
 import logging
 import importlib
+import hbmqtt.client as mqtt_client
 
 # TEST loggers
 log = logging.getLogger("root")
@@ -39,35 +40,37 @@ class BehaviorContext(object):
 class BaseBehavior(object):
     """Base interface for behaviors."""
 
-    def __init__(self, behavior_id, config=None):
+    def __init__(self, behavior_id: int, name: str, broker: mqtt_client.MQTTClient):
         self.id = behavior_id
-        self.config = config
-        if not self.config:
-            self.config = {}
-        # TODO check config based on schema
+        self.name = name
+        self.broker = broker
 
     @classmethod
     def get_config_schema(cls):
         """Returns the configuration schema for this behavior."""
         raise NotImplementedError()
 
-    def startup(self):
+    async def startup(self, config):
         """Called when the behavior is started."""
         raise NotImplementedError()
 
-    def shutdown(self):
+    async def shutdown(self):
         """Called when the behavior is stopped."""
         raise NotImplementedError()
 
-    def sensor_data(self, todo):  # TODO
+    async def update(self, config):
+        """Called when the behavior configuration changes."""
+        raise NotImplementedError()
+
+    async def sensor_data(self, topic: str, data: dict):
         """Called when a sensor has new data."""
         pass
 
-    def device_state(self, todo):  # TODO
+    async def device_state(self, device_topic: str, data: dict):
         """Called when a device changes its state."""
         pass
 
-    def timer(self):
+    async def timer(self):
         """Called when the timer ticks."""
         pass
 
@@ -80,8 +83,8 @@ def get_behavior_handler_class(behavior_id: str):
         return getattr(module, b_class)
 
 
-def get_behavior_handler(behavior_id: str, config: dict) -> BaseBehavior:
+def get_behavior_handler(behavior_id: int, name: str, broker: mqtt_client.MQTTClient) -> BaseBehavior:
     """Returns an appropriate behavior handler instance for the given behavior id."""
-    handler_class = get_behavior_handler_class(behavior_id)
+    handler_class = get_behavior_handler_class(name)
     if handler_class:
-        return handler_class(behavior_id, config)
+        return handler_class(behavior_id, name, broker)
