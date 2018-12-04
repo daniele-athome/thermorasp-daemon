@@ -85,7 +85,7 @@ class SensorManager(object):
             if message.topic.startswith(sensor_instance.topic):
                 topic = message.topic.split('/')
                 sensor_type = topic[-1]
-                data = json.loads(message.data.decode('utf-8'))
+                data = json.loads(message.data.decode())
                 log.debug(data)
                 reading_timestamp = parse_date(data['timestamp'])
                 # store reading in database

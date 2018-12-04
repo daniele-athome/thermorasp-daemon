@@ -43,9 +43,6 @@ class RandomSensorHandler(BaseSensorHandler):
         else:
             self.interval = self.DEFAULT_INTERVAL
 
-    def startup(self):
-        BaseSensorHandler.startup(self)
-
     async def connected(self):
         await self.timeout()
         self.start_timer(self.interval)

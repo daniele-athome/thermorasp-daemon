@@ -22,23 +22,14 @@ class MemoryOnOffDeviceHandler(BaseDeviceHandler):
         BaseDeviceHandler.__init__(self, device_id, device_type, protocol, address, name)
         self.enabled = False
 
-    def startup(self):
-        pass
-
-    def shutdown(self):
-        pass
-
-    def control(self, *args, **kwargs):
-        if 'enabled' in kwargs and kwargs['enabled']:
+    async def control(self, data):
+        if 'enabled' in data and data['enabled']:
             self.enabled = True
         else:
             self.enabled = False
 
-        eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', 'enabled:%d' % self.enabled)
-        return True
-
-    def status(self, *args, **kwargs):
-        return {'enabled': self.enabled}
+        # TODO eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', 'enabled:%d' % self.enabled)
+        await self.publish_state({'enabled': self.enabled})
 
 
 class GPIOSwitchDeviceHandler(BaseDeviceHandler):

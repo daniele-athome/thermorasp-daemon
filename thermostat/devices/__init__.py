@@ -1,9 +1,17 @@
 # -*- coding: utf-8 -*-
 """Devices communication protocols."""
 
+import json
+import asyncio
+import logging
 import importlib
+import hbmqtt.client as mqtt_client
 
+from .. import app
 from ..errors import NotSupportedError
+
+# TEST loggers
+log = logging.getLogger("root")
 
 
 class BaseDeviceHandler(object):
@@ -21,22 +29,49 @@ class BaseDeviceHandler(object):
         self.protocol = protocol
         self.address = address.split(':', 1)
         self.name = name
+        self.is_running = False
+        self.broker = mqtt_client.MQTTClient()
+        self.topic = app.new_topic('device/' + device_id)
+
+    async def _connect(self):
+        await self.broker.connect(app.broker_url)
+        log.debug("Device " + self.id + " connected to broker")
+        await self.connected()
+        await self.broker.subscribe([(self.topic + '/control', mqtt_client.QOS_2)])
+        while self.is_running:
+            message = await self.broker.deliver_message()
+            log.debug(self.id + " DEVICE topic={}, payload={}".format(message.topic, message.data))
+            await self.control(json.loads(message.data.decode()))
+
+    async def _disconnect(self):
+        await self.broker.disconnect()
+        await self.disconnected()
 
     def startup(self):
         """Called on startup/registration."""
-        raise NotImplementedError()
+        self.is_running = True
+        # connect to broker
+        asyncio.ensure_future(self._connect())
 
     def shutdown(self):
         """Called on shutdown/unregistration."""
-        raise NotImplementedError()
+        self.is_running = False
+        asyncio.ensure_future(self._disconnect())
 
-    def control(self, *args, **kwargs):
+    async def connected(self):
+        """Called when we are connected to the broker."""
+        pass
+
+    async def disconnected(self):
+        """Called when we disconnect from the broker."""
+        pass
+
+    async def control(self, data):
         """Generic control interface. Implementation-dependent."""
         raise NotImplementedError()
 
-    def status(self, *args, **kwargs):
-        """Generic status reading interface. Implementation-dependent."""
-        raise NotImplementedError()
+    async def publish_state(self, data):
+        self.broker.publish(self.topic + '/state', json.dumps(data).encode())
 
     def is_supported(self, device_type):
         return device_type in self.SUPPORTED_TYPES

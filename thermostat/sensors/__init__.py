@@ -29,11 +29,12 @@ class BaseSensorHandler(object):
         await self.broker.connect(app.broker_url)
         log.debug("Sensor " + self.id + " connected to broker")
         await self.connected()
-        await self.broker.subscribe([(self.topic, mqtt_client.QOS_0)])
+        # TODO what do we control here?
+        await self.broker.subscribe([(self.topic + '/control', mqtt_client.QOS_0)])
         while self.is_running:
             message = await self.broker.deliver_message()
             log.debug(self.id + " SENSOR topic={}, payload={}".format(message.topic, message.data))
-            await self.message(message.data.decode('utf-8'))
+            await self.message(message.data.decode())
 
     async def _disconnect(self):
         await self.broker.disconnect()
@@ -48,7 +49,7 @@ class BaseSensorHandler(object):
             await self.timeout()
 
     async def publish(self, payload, append_topic='', retain=None):
-        await self.broker.publish(self.topic + append_topic, json.dumps(payload).encode('utf-8'), retain=retain)
+        await self.broker.publish(self.topic + append_topic, json.dumps(payload).encode(), retain=retain)
 
     def startup(self):
         self.is_running = True
@@ -70,6 +71,7 @@ class BaseSensorHandler(object):
     async def disconnected(self):
         pass
 
+    # TODO since we subscribed to topic "control", "message" might be confusing
     async def message(self, payload):
         pass
 

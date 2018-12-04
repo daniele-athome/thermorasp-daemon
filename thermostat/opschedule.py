@@ -26,6 +26,8 @@ class OperatingSchedule(object):
         self.behavior = None
         # definition of the currently running behavior (dict)
         self.behavior_def = None
+        # the currently operating behavior subscription task
+        self.behavior_sub = None
         self.broker = mqtt_client.MQTTClient()
         self.is_running = False
 
@@ -37,6 +39,8 @@ class OperatingSchedule(object):
 
     async def shutdown(self):
         self.is_running = False
+        if self.behavior:
+            await self.stop_behavior()
         await self.broker.disconnect()
 
     async def timer(self):
@@ -69,13 +73,16 @@ class OperatingSchedule(object):
         bev = get_behavior_handler(bev_def['id'], bev_def['name'], sensor_topics, device_topics, self.broker)
         # the subscribe method will also listen for messages so we'll just fire it off
         # noinspection PyAsyncCall
-        asyncio.ensure_future(self.subscribe_for_behavior(bev))
         await bev.startup(bev_def['config'])
         self.behavior_def = bev_def
         self.behavior = bev
+        self.behavior_sub = asyncio.ensure_future(self.subscribe_for_behavior(bev))
 
     async def stop_behavior(self):
         """Stop the currently running behavior."""
+        # cancel immediately
+        self.behavior_sub.cancel()
+
         sensor_topics = self.get_sensor_topics()
         if sensor_topics:
             await self.broker.unsubscribe(sensor_topics)
@@ -87,6 +94,7 @@ class OperatingSchedule(object):
         await self.behavior.shutdown()
         self.behavior = None
         self.behavior_def = None
+        self.behavior_sub = None
 
     async def subscribe_for_behavior(self, bev):
         log.debug(bev)
@@ -97,12 +105,10 @@ class OperatingSchedule(object):
             await self.broker.subscribe([(sensor.topic + '/+', mqtt_client.QOS_0)])
 
         # subscribe to required devices
-        """
         for device_id in self.behavior_def['devices']:
             device = self.devices[device_id]
             log.debug("SCHEDULE subscribing to device {}".format(device.topic))
             await self.broker.subscribe([(device.topic + '/+', mqtt_client.QOS_0)])
-        """
 
         while self.is_running and self.behavior_def:
             message = await self.broker.deliver_message()
@@ -125,12 +131,9 @@ class OperatingSchedule(object):
         return [self.sensors[sensor_id].topic for sensor_id in behavior_def['sensors']]
 
     def get_device_topics(self, behavior_def=None):
-        """
         if behavior_def is None:
             behavior_def = self.behavior_def
         return [self.devices[device_id].topic for device_id in behavior_def['devices']]
-        """
-        return []
 
     def find_current_behavior(self, offset):
         candidate = None
