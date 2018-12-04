@@ -52,13 +52,33 @@ class TargetTemperatureBehavior(BaseBehavior):
         self._init(config)
 
     async def sensor_data(self, topic: str, data: dict):
+        await BaseBehavior.sensor_data(self, topic, data)
         log.debug("TARGET got sensor data from {}: {}".format(topic, data))
         log.debug("TARGET devices: {}".format(self.devices))
 
+        avg_temp = self.last_reading_avg('celsius')
+        if avg_temp is None:
+            # TODO context.event_logger.event(eventlog.LEVEL_WARNING, log_source, 'action', 'last reading: (none), unable to proceed')
+            return
+
+        last_reading = round(avg_temp, 1)
+        target_temperature = round(self.target_temperature, 1)
+        if self.cooling:
+            enabled = last_reading > target_temperature
+        else:
+            enabled = last_reading < target_temperature
+        # TODO context.event_logger.event(eventlog.LEVEL_INFO, log_source, 'behavior:action',
+        #                           'last reading: {}, target: {}, enabled: {}'
+        #                           .format(last_reading, target_temperature, enabled))
+        for device in self.devices:
+            await self.control_device(device, {'enabled': enabled})
+
     async def device_state(self, topic: str, data: dict):
+        await BaseBehavior.device_state(self, topic, data)
         log.debug("TARGET got device state from {}: {}".format(topic, data))
 
 
+# @deprecated
 def thermostat_control(log_source, context, device_id, target_temperature, cooling=True):
     """A simple thermostat function to decide wether to activate a device or not."""
 

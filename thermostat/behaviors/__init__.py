@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """Smart automation behaviors."""
 
+import json
 import logging
+import statistics
 import importlib
 import hbmqtt.client as mqtt_client
 
@@ -9,6 +11,7 @@ import hbmqtt.client as mqtt_client
 log = logging.getLogger("root")
 
 
+# @deprecated
 class BehaviorContext(object):
     """
     Objects passed to BaseBehavior.execute will be instances of this class.
@@ -50,6 +53,7 @@ class BaseBehavior(object):
         self.sensors = sensors
         self.devices = devices
         self.broker = broker
+        self.last_sensor_data = {}
 
     @classmethod
     def get_config_schema(cls):
@@ -70,7 +74,7 @@ class BaseBehavior(object):
 
     async def sensor_data(self, topic: str, data: dict):
         """Called when a sensor has new data."""
-        pass
+        self.last_sensor_data[topic] = data
 
     async def device_state(self, device_topic: str, data: dict):
         """Called when a device changes its state."""
@@ -79,6 +83,16 @@ class BaseBehavior(object):
     async def timer(self):
         """Called when the timer ticks."""
         pass
+
+    async def control_device(self, topic, data):
+        await self.broker.publish(topic + '/control', json.dumps(data).encode(), retain=False)
+
+    def last_reading_avg(self, unit):
+        # TODO take timestamp into account (i.e. skip too old values)
+        if self.last_sensor_data:
+            return statistics.mean([data['value'] for data in self.last_sensor_data.values() if data['unit'] == unit])
+        else:
+            return None
 
 
 def get_behavior_handler_class(behavior_id: str):

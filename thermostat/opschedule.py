@@ -97,7 +97,6 @@ class OperatingSchedule(object):
         self.behavior_sub = None
 
     async def subscribe_for_behavior(self, bev):
-        log.debug(bev)
         # subscribe to required sensors
         for sensor_id in self.behavior_def['sensors']:
             sensor = self.sensors[sensor_id]

@@ -32,6 +32,7 @@ class MemoryOnOffDeviceHandler(BaseDeviceHandler):
         await self.publish_state({'enabled': self.enabled})
 
 
+# TODO update
 class GPIOSwitchDeviceHandler(BaseDeviceHandler):
     """Raspberry device handler that goes ON/OFF through a GPIO."""
 
@@ -64,6 +65,7 @@ class GPIOSwitchDeviceHandler(BaseDeviceHandler):
         return {'enabled': self.enabled}
 
 
+# TODO update
 class GPIO2SwitchDeviceHandler(GPIOSwitchDeviceHandler):
     """Raspberry device handler that goes ON/OFF through a GPIO, completely turning off the pin on disable."""
 
