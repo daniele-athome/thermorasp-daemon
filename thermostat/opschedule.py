@@ -64,7 +64,9 @@ class OperatingSchedule(object):
 
     async def start_behavior(self, bev_def):
         """Start a behavior and assign it to the current status."""
-        bev = get_behavior_handler(bev_def['id'], bev_def['name'], self.broker)
+        sensor_topics = self.get_sensor_topics(bev_def)
+        device_topics = self.get_device_topics(bev_def)
+        bev = get_behavior_handler(bev_def['id'], bev_def['name'], sensor_topics, device_topics, self.broker)
         # the subscribe method will also listen for messages so we'll just fire it off
         # noinspection PyAsyncCall
         asyncio.ensure_future(self.subscribe_for_behavior(bev))
@@ -74,15 +76,13 @@ class OperatingSchedule(object):
 
     async def stop_behavior(self):
         """Stop the currently running behavior."""
-        sensor_topics = [self.sensors[sensor_id].topic for sensor_id in self.behavior_def['sensors']]
+        sensor_topics = self.get_sensor_topics()
         if sensor_topics:
             await self.broker.unsubscribe(sensor_topics)
 
-        """
-        device_topics = [self.devices[device_id].topic for device_id in self.behavior_def['devices']]
+        device_topics = self.get_device_topics()
         if device_topics:
             await self.broker.unsubscribe(device_topics)
-        """
 
         await self.behavior.shutdown()
         self.behavior = None
@@ -118,6 +118,19 @@ class OperatingSchedule(object):
                      for device_id in self.behavior_def['devices']):
                 # noinspection PyAsyncCall
                 asyncio.ensure_future(bev.device_state(message.topic, json.loads(message.data)))
+
+    def get_sensor_topics(self, behavior_def=None):
+        if behavior_def is None:
+            behavior_def = self.behavior_def
+        return [self.sensors[sensor_id].topic for sensor_id in behavior_def['sensors']]
+
+    def get_device_topics(self, behavior_def=None):
+        """
+        if behavior_def is None:
+            behavior_def = self.behavior_def
+        return [self.devices[device_id].topic for device_id in behavior_def['devices']]
+        """
+        return []
 
     def find_current_behavior(self, offset):
         candidate = None

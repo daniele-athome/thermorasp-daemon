@@ -40,9 +40,15 @@ class BehaviorContext(object):
 class BaseBehavior(object):
     """Base interface for behaviors."""
 
-    def __init__(self, behavior_id: int, name: str, broker: mqtt_client.MQTTClient):
+    def __init__(self, behavior_id: int, name: str, sensors: list, devices: list, broker: mqtt_client.MQTTClient):
+        """
+        :param sensors: list of topics of the sensors assigned to the behavior
+        :param devices: list of topics of the devices assigned to the behavior
+        """
         self.id = behavior_id
         self.name = name
+        self.sensors = sensors
+        self.devices = devices
         self.broker = broker
 
     @classmethod
@@ -83,8 +89,8 @@ def get_behavior_handler_class(behavior_id: str):
         return getattr(module, b_class)
 
 
-def get_behavior_handler(behavior_id: int, name: str, broker: mqtt_client.MQTTClient) -> BaseBehavior:
+def get_behavior_handler(behavior_id: int, name: str, sensors, devices, broker: mqtt_client.MQTTClient) -> BaseBehavior:
     """Returns an appropriate behavior handler instance for the given behavior id."""
     handler_class = get_behavior_handler_class(name)
     if handler_class:
-        return handler_class(behavior_id, name, broker)
+        return handler_class(behavior_id, name, sensors, devices, broker)

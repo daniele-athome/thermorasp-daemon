@@ -15,8 +15,8 @@ log = logging.getLogger("root")
 class TargetTemperatureBehavior(BaseBehavior):
     """A base behavior for setting a target temperature."""
 
-    def __init__(self, behavior_id: int, name: str, broker: mqtt_client.MQTTClient):
-        BaseBehavior.__init__(self, behavior_id, name, broker)
+    def __init__(self, behavior_id: int, name: str, sensors: list, devices: list, broker: mqtt_client.MQTTClient):
+        BaseBehavior.__init__(self, behavior_id, name, sensors, devices, broker)
         self.cooling = None
         self.target_temperature = None
 
@@ -53,6 +53,7 @@ class TargetTemperatureBehavior(BaseBehavior):
 
     async def sensor_data(self, topic: str, data: dict):
         log.debug("TARGET got sensor data from {}: {}".format(topic, data))
+        log.debug("TARGET devices: {}".format(self.devices))
 
     async def device_state(self, topic: str, data: dict):
         log.debug("TARGET got device state from {}: {}".format(topic, data))
