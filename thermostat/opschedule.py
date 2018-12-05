@@ -8,8 +8,6 @@ import datetime
 import functools
 import hbmqtt.client as mqtt_client
 
-from asyncio import Task
-
 from . import app
 from .sensorman import SensorManager
 from .deviceman import DeviceManager
@@ -146,7 +144,7 @@ class OperatingSchedule(object):
                 asyncio.ensure_future(behavior.device_state(message.topic, json.loads(message.data))) \
                        .add_done_callback(self._future_result)
 
-    def _future_result(self, task: Task):
+    def _future_result(self, task: asyncio.Future):
         try:
             task.result()
         except SelfDestructError:
@@ -174,7 +172,7 @@ class OperatingSchedule(object):
         return candidate
 
     # noinspection PyUnusedLocal
-    def _delete_behavior(self, task: Task, behavior_def):
+    def _delete_behavior(self, task: asyncio.Future, behavior_def):
         """Remove the given behavior from our schedule."""
         self.delete_behavior(behavior_def)
 
