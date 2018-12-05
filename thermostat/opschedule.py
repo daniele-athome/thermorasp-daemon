@@ -151,6 +151,7 @@ class OperatingSchedule(object):
             task.result()
         except SelfDestructError:
             log.debug("Behavior self-destructed")
+            task.exception()
             asyncio.ensure_future(self.stop_behavior()) \
                 .add_done_callback(functools.partial(self._delete_behavior, behavior_def=self.behavior_def))
 
