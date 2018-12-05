@@ -30,7 +30,7 @@ class BaseDeviceHandler(object):
         self.address = address.split(':', 1)
         self.name = name
         self.is_running = False
-        self.broker = mqtt_client.MQTTClient()
+        self.broker = mqtt_client.MQTTClient(config={'auto_reconnect': False})
         self.topic = app.new_topic('device/' + device_id)
 
     async def _connect(self):

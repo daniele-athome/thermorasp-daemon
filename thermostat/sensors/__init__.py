@@ -20,14 +20,13 @@ class BaseSensorHandler(object):
         self.id = sensor_id
         self.address = address
         self.type = sensor_type
-        self.broker = mqtt_client.MQTTClient()
+        self.broker = mqtt_client.MQTTClient(config={'auto_reconnect': False})
         self.is_running = False
         self.timer = None
         self.topic = app.new_topic('sensor/' + sensor_id)
 
     async def _connect(self):
         await self.broker.connect(app.broker_url)
-        log.debug("Sensor " + self.id + " connected to broker")
         await self.connected()
         # TODO what do we control here?
         await self.broker.subscribe([(self.topic + '/control', mqtt_client.QOS_0)])

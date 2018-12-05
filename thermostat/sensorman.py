@@ -25,7 +25,7 @@ class SensorManager(object):
 
     def __init__(self, database):
         self.database = database
-        self.broker = mqtt_client.MQTTClient()
+        self.broker = mqtt_client.MQTTClient(config={'auto_reconnect': False})
         self.connected = False
         # sensor_id: {...}
         self.readings = {}
@@ -49,6 +49,7 @@ class SensorManager(object):
         for sensor_instance in self.sensors.values():
             self.sensors_subs[sensor_instance.id] = \
                 asyncio.ensure_future(self._subscribe_and_startup_sensor(sensor_instance))
+        await asyncio.gather(*self.sensors_subs.values())
 
     def _init(self):
         with scoped_session(self.database) as session:
@@ -68,9 +69,10 @@ class SensorManager(object):
 
     def _unregister(self, sensor_id):
         self.sensors[sensor_id].shutdown()
-        self.sensors_subs[sensor_id].cancel()
+        if sensor_id in self.sensors_subs:
+            self.sensors_subs[sensor_id].cancel()
+            del self.sensors_subs[sensor_id]
         del self.sensors[sensor_id]
-        del self.sensors_subs[sensor_id]
 
     async def _subscribe_and_startup_sensor(self, sensor_instance):
         await self.broker.subscribe([(sensor_instance.topic + '/+', mqtt_client.QOS_0)])
@@ -85,6 +87,10 @@ class SensorManager(object):
             if message.topic.startswith(sensor_instance.topic):
                 topic = message.topic.split('/')
                 sensor_type = topic[-1]
+                if sensor_type == 'control':
+                    # someone trying to control the sensor
+                    continue
+
                 data = json.loads(message.data.decode())
                 log.debug(data)
                 reading_timestamp = parse_date(data['timestamp'])

@@ -40,6 +40,11 @@ class BehaviorContext(object):
         self.delete = True
 
 
+class SelfDestructError(Exception):
+    """Raise this in any callback method from a behavior to let the OperatingSchedule know to destroy it."""
+    pass
+
+
 class BaseBehavior(object):
     """Base interface for behaviors."""
 

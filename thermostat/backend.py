@@ -27,12 +27,14 @@ class TimerNode(object):
         self.seconds = seconds
         self.topic = app.new_topic(node_id + '/_internal')
 
-        self.broker = mqtt_client.MQTTClient()
+        self.broker = mqtt_client.MQTTClient(config={'auto_reconnect': False})
         asyncio.ensure_future(self._connect())
 
     async def _connect(self):
-        await self.broker.connect(app.broker_url)
-        await asyncio.ensure_future(self._loop())
+        while app.is_running:
+            await self.broker.connect(app.broker_url)
+            log.debug("Timer connected to broker")
+            await self._loop()
 
     async def _loop(self):
         while app.is_running:
@@ -70,7 +72,7 @@ class Backend(object):
         self.sensors = sensorman.SensorManager(self.app.database)
         self.devices = deviceman.DeviceManager(self.app.database)
         self.event_logger = EventLogger(self.app.database)
-        self.broker = mqtt_client.MQTTClient()
+        self.broker = mqtt_client.MQTTClient(config={'auto_reconnect': False})
         # the operating (active) schedule
         self.schedule = None
         self.schedule_lock = asyncio.Lock()
@@ -83,16 +85,20 @@ class Backend(object):
         asyncio.ensure_future(self._connect())
 
     async def _connect(self):
-        await self.broker.connect(self.app.broker_url)
-        log.debug("Backend connected to broker")
-        await self.broker.subscribe([(self.timer.topic, mqtt_client.QOS_0)])
-        await self.backend()
-        while self.app.is_running:
-            message = await self.broker.deliver_message()
-            log.debug("BROKER topic={}, payload={}".format(message.topic, message.data))
-            if message.topic == self.timer.topic:
-                if message.data == b'timer':
-                    await self.backend()
+        try:
+            await self.broker.connect(self.app.broker_url)
+            log.debug("Backend connected to broker")
+            await self.broker.subscribe([(self.timer.topic, mqtt_client.QOS_0)])
+            await self.backend()
+            while self.app.is_running:
+                message = await self.broker.deliver_message()
+                log.debug("BROKER topic={}, payload={}".format(message.topic, message.data))
+                if message.topic == self.timer.topic:
+                    if message.data == b'timer':
+                        await self.backend()
+        except mqtt_client.ClientException:
+            log.debug("Unable to connect to broker! Shutting down.")
+            app.stop()
 
     async def backend(self):
         try:
