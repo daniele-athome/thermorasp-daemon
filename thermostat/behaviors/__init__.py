@@ -7,37 +7,11 @@ import statistics
 import importlib
 import hbmqtt.client as mqtt_client
 
+from .. import app, util
+
+
 # TEST loggers
 log = logging.getLogger("root")
-
-
-# @deprecated
-class BehaviorContext(object):
-    """
-    Objects passed to BaseBehavior.execute will be instances of this class.
-    This class contains the current state of the system for behaviors to operate,
-    such as instances of sensors (to get readings) and devices (to control them).
-    """
-
-    def __init__(self, event_logger, devices, last_reading=None):
-        """
-        :param event_logger: the event logger instance
-        :type event_logger: EventLogger
-        :param devices: a dictionary of all registered devices related to the active pipeline
-        :type devices: dict
-        :param last_reading: a dictionary of the last reading from each sensor type. '_avg' will have an average of all.
-        :type last_reading: dict
-        """
-        self.event_logger = event_logger
-        self.devices = devices
-        self.last_reading = last_reading
-        self.delete = False
-        # this will be passed among all behaviors in the chain
-        self.params = {}
-
-    def delete_self(self):
-        """Behaviors will call this if they wants to be removed from the active pipeline."""
-        self.delete = True
 
 
 class SelfDestructError(Exception):
@@ -93,9 +67,12 @@ class BaseBehavior(object):
         await self.broker.publish(topic + '/control', json.dumps(data).encode(), retain=False)
 
     def last_reading_avg(self, unit):
-        # TODO take timestamp into account (i.e. skip too old values)
         if self.last_sensor_data:
-            return statistics.mean([data['value'] for data in self.last_sensor_data.values() if data['unit'] == unit])
+            values = [data['value'] for data in self.last_sensor_data.values()
+                      if data['unit'] == unit and not util.is_past_then(data['timestamp'],
+                                                                        app.default_sensors_validity)]
+            if values:
+                return statistics.mean(values)
         else:
             return None
 

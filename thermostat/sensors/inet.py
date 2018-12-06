@@ -35,7 +35,7 @@ class HTTPSensorHandler(BaseSensorHandler):
             try:
                 temp, unit = await asyncio.get_event_loop().run_in_executor(None, self._read)
             except ValueError:
-                app.eventlog.event_exc(eventlog.LEVEL_WARNING, self.id, 'exception')
+                app.eventlog.event_exc(eventlog.LEVEL_WARNING, self.get_name(), 'exception')
                 return
 
             if self.last_temperature is None or self.last_temperature != temp:

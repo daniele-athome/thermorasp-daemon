@@ -19,9 +19,12 @@ parser.add_argument('-d', '--debug', action='store_true', help='enable debug')
 args = parser.parse_args()
 
 app.config.from_pyfile(args.config)
+
+app.broker_url = 'mqtt://' + app.config['BROKER_HOST'] + ':' + str(app.config['BROKER_PORT']) + '/'
+app.default_sensors_validity = app.config['SENSORS_VALIDITY']
+
 app.database = database.init(app.config['DATABASE_URL'])
 app.eventlog = eventlog.init(app.database)
-app.broker_url = 'mqtt://' + app.config['BROKER_HOST'] + ':' + str(app.config['BROKER_PORT']) + '/'
 
 asyncio.set_event_loop(uvloop.new_event_loop())
 

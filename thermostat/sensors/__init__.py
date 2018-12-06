@@ -74,6 +74,9 @@ class BaseSensorHandler(object):
     async def message(self, payload):
         pass
 
+    def get_name(self):
+        return 'sensor:' + self.id
+
 
 def get_sensor_handler(sensor_id: str, protocol: str, address: str, sensor_type: str) -> BaseSensorHandler:
     """Returns an appropriate sensor handler for the given protocol and address."""
