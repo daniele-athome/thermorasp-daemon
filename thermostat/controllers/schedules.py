@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Pipelines API."""
+"""Schedules API."""
 
 from json import loads as json_loads
 from json import dumps as json_dumps
@@ -59,4 +59,15 @@ async def get(request: Request, schedule_id: int):
         try:
             return json(serialize_schedule(session.query(Schedule).filter(Schedule.id == schedule_id).one()))
         except NoResultFound:
-            raise errors.NotFoundError('Pipeline not found.')
+            raise errors.NotFoundError('Schedule not found.')
+
+
+# noinspection PyUnusedLocal
+@app.get('/schedules/active')
+async def active(request: Request):
+    """Get the active schedule."""
+
+    if app.backend.schedule is None:
+        raise errors.NotFoundError('No active schedule.')
+
+    return json(app.backend.schedule.schedule)
