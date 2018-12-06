@@ -42,8 +42,8 @@ class Behavior(Base):
     end_time = Column(SmallInteger())
     config = Column(String(500), default='{}', server_default='{}')
 
-    sensors = relationship("BehaviorSensors", cascade="all, delete-orphan")
-    devices = relationship("BehaviorDevices", cascade="all, delete-orphan")
+    sensors = relationship("BehaviorSensor", cascade="all, delete-orphan")
+    devices = relationship("BehaviorDevice", cascade="all, delete-orphan")
 
     # Methods
     def __repr__(self):
@@ -51,7 +51,7 @@ class Behavior(Base):
         return '<Behavior: #{} {}/{}>'.format(self.id, self.schedule_id, self.behavior_name)
 
 
-class BehaviorSensors(Base):
+class BehaviorSensor(Base):
     __tablename__ = 'behavior_sensors'
 
     # primary key
@@ -59,7 +59,7 @@ class BehaviorSensors(Base):
     sensor_id = Column(String(255), primary_key=True)
 
 
-class BehaviorDevices(Base):
+class BehaviorDevice(Base):
     __tablename__ = 'behavior_devices'
 
     # primary key

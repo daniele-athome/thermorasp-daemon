@@ -34,4 +34,4 @@ def no_content(status=204, headers=None):
 
 
 # import other controllers
-from . import sensors, devices, behaviors, eventlog
+from . import sensors, devices, schedules, behaviors, eventlog

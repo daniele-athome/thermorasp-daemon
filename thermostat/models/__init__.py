@@ -14,4 +14,4 @@ Base = declarative_base()
 from .sensors import Sensor, Reading
 from .devices import Device
 from .eventlog import EventLog
-from .schedules import Schedule, Behavior
+from .schedules import Schedule, Behavior, BehaviorSensor, BehaviorDevice
