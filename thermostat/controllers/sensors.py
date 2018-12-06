@@ -94,4 +94,8 @@ async def reading(request: Request):
 async def reading(request: Request, sensor_id: str):
     """Reads the latest sensor reading from the database."""
 
-    return json(serialize_sensor_reading(sensor_id, app.backend.sensors.get_last_reading(sensor_id)))
+    r = app.backend.sensors.get_last_reading(sensor_id)
+    if r:
+        return json(serialize_sensor_reading(sensor_id, r))
+    else:
+        return json({})

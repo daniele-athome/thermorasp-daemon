@@ -133,7 +133,7 @@ class SensorManager(object):
             sensor.sensor_type = sensor_type
             sensor = session.merge(sensor)
             # will also unregister old device if any
-            self._register(sensor.id, sensor.protocol, sensor.address)
+            self._register(sensor.id, sensor.protocol, sensor.address, sensor.sensor_type)
 
     def unregister(self, sensor_id):
         try:
