@@ -43,8 +43,20 @@ def serialize_schedule(s: Schedule):
 # noinspection PyUnusedLocal
 @app.get('/schedules')
 async def index(request: Request):
-    """List all registered pipelines."""
+    """List all registered schedules."""
 
     with scoped_session(app.database) as session:
         schedules = [serialize_schedule(s) for s in session.query(Schedule).all()]
     return json(schedules)
+
+
+# noinspection PyUnusedLocal
+@app.get('/schedules/<schedule_id>')
+async def get(request: Request, schedule_id: int):
+    """Get the requested schedule."""
+
+    with scoped_session(app.database) as session:
+        try:
+            return json(serialize_schedule(session.query(Schedule).filter(Schedule.id == schedule_id).one()))
+        except NoResultFound:
+            raise errors.NotFoundError('Pipeline not found.')
