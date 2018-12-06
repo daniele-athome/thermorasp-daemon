@@ -5,6 +5,7 @@ import logging
 import hbmqtt.client as mqtt_client
 
 from . import BaseBehavior
+from .. import app
 from ..models import eventlog
 
 
@@ -58,7 +59,7 @@ class TargetTemperatureBehavior(BaseBehavior):
 
         avg_temp = self.last_reading_avg('celsius')
         if avg_temp is None:
-            # TODO context.event_logger.event(eventlog.LEVEL_WARNING, log_source, 'action', 'last reading: (none), unable to proceed')
+            app.eventlog.event(eventlog.LEVEL_WARNING, self.name, 'action', 'last reading: (none), unable to proceed')
             return
 
         last_reading = round(avg_temp, 1)
@@ -67,9 +68,9 @@ class TargetTemperatureBehavior(BaseBehavior):
             enabled = last_reading > target_temperature
         else:
             enabled = last_reading < target_temperature
-        # TODO context.event_logger.event(eventlog.LEVEL_INFO, log_source, 'behavior:action',
-        #                           'last reading: {}, target: {}, enabled: {}'
-        #                           .format(last_reading, target_temperature, enabled))
+        app.eventlog.event(eventlog.LEVEL_INFO, self.name, 'behavior:action',
+                           'last reading: {}, target: {}, enabled: {}'
+                           .format(last_reading, target_temperature, enabled))
         for device in self.devices:
             await self.control_device(device, {'enabled': enabled})
 

@@ -10,6 +10,7 @@ except ImportError:
 
 
 from . import BaseDeviceHandler
+from .. import app
 from ..models import eventlog
 
 
@@ -23,16 +24,11 @@ class MemoryOnOffDeviceHandler(BaseDeviceHandler):
         self.enabled = False
 
     async def control(self, data):
-        if 'enabled' in data and data['enabled']:
-            self.enabled = True
-        else:
-            self.enabled = False
-
-        # TODO eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', 'enabled:%d' % self.enabled)
+        self.enabled = 'enabled' in data and data['enabled']
+        app.eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', 'enabled:%d' % self.enabled)
         await self.publish_state({'enabled': self.enabled})
 
 
-# TODO update
 class GPIOSwitchDeviceHandler(BaseDeviceHandler):
     """Raspberry device handler that goes ON/OFF through a GPIO."""
 
@@ -55,17 +51,13 @@ class GPIOSwitchDeviceHandler(BaseDeviceHandler):
     def shutdown(self):
         self.set_switch(False)
 
-    def control(self, *args, **kwargs):
-        enabled = 'enabled' in kwargs and kwargs['enabled']
+    async def control(self, data):
+        enabled = 'enabled' in data and data['enabled']
         self.set_switch(enabled)
-        eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', 'enabled:%d' % enabled)
-        return True
-
-    def status(self, *args, **kwargs):
-        return {'enabled': self.enabled}
+        app.eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', 'enabled:%d' % enabled)
+        await self.publish_state({'enabled': self.enabled})
 
 
-# TODO update
 class GPIO2SwitchDeviceHandler(GPIOSwitchDeviceHandler):
     """Raspberry device handler that goes ON/OFF through a GPIO, completely turning off the pin on disable."""
 

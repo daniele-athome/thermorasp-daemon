@@ -4,7 +4,6 @@
 import sys
 import logging
 import asyncio
-import datetime
 import sdnotify
 import json
 
@@ -12,7 +11,7 @@ import hbmqtt.client as mqtt_client
 
 from .database import scoped_session
 from . import app, sensorman, deviceman, opschedule
-from .models import Sensor, EventLog, Schedule
+from .models import Sensor, Schedule
 from .models import eventlog
 
 
@@ -42,28 +41,6 @@ class TimerNode(object):
             await self.broker.publish(self.topic, b'timer', retain=False)
 
 
-class EventLogger(object):
-    def __init__(self, database):
-        self.database = database
-
-    def event(self, level, source, name, description=None):
-        with scoped_session(self.database) as session:
-            vevent = EventLog()
-            vevent.timestamp = datetime.datetime.now()
-            vevent.level = level
-            vevent.source = source
-            vevent.name = name
-            vevent.description = description
-            session.add(vevent)
-
-    def event_exc(self, level, source, name):
-        import traceback
-        e_type, e_value, e_tb = sys.exc_info()
-        strerr1 = traceback.format_exception_only(e_type, e_value)[0][:-1]
-        strerr = ''.join(traceback.format_exception(e_type, e_value, e_tb))
-        self.event(level, source, name, strerr1 + "\n" + strerr)
-
-
 class Backend(object):
     """The backend operations thread."""
 
@@ -71,7 +48,6 @@ class Backend(object):
         self.app = myapp
         self.sensors = sensorman.SensorManager(self.app.database)
         self.devices = deviceman.DeviceManager(self.app.database)
-        self.event_logger = EventLogger(self.app.database)
         self.broker = mqtt_client.MQTTClient(config={'auto_reconnect': False})
         # the operating (active) schedule
         self.schedule = None
@@ -106,7 +82,7 @@ class Backend(object):
             await self.backend_ops()
         except:
             log.error('Unexpected error:', exc_info=sys.exc_info())
-            self.event_logger.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
+            app.eventlog.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
 
     async def backend_ops(self):
         """All backend cycle operations are here."""
@@ -117,8 +93,8 @@ class Backend(object):
                 schedules = self.get_enabled_schedules()
                 if len(schedules) > 0:
                     if len(schedules) > 1:
-                        self.event_logger.event(eventlog.LEVEL_WARNING, 'backend', 'configuration',
-                                                "Multiple schedules active. We'll take the first one")
+                        app.eventlog.event(eventlog.LEVEL_WARNING, 'backend', 'configuration',
+                                           "Multiple schedules active. We'll take the first one")
 
                     # take only the first one
                     schedule = schedules[0]

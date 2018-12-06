@@ -9,7 +9,7 @@ import uvloop
 from signal import signal, SIGINT, SIGTERM
 from argparse import ArgumentParser
 
-from thermostat import app, database
+from thermostat import app, database, eventlog
 
 parser = ArgumentParser(__doc__)
 parser.add_argument('-p', '--port', type=int, default=7475, help='port to listen for API calls')
@@ -20,6 +20,7 @@ args = parser.parse_args()
 
 app.config.from_pyfile(args.config)
 app.database = database.init(app.config['DATABASE_URL'])
+app.eventlog = eventlog.init(app.database)
 app.broker_url = 'mqtt://' + app.config['BROKER_HOST'] + ':' + str(app.config['BROKER_PORT']) + '/'
 
 asyncio.set_event_loop(uvloop.new_event_loop())
