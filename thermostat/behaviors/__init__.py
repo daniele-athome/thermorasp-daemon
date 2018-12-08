@@ -5,6 +5,7 @@ import json
 import logging
 import statistics
 import importlib
+import pkgutil
 import hbmqtt.client as mqtt_client
 
 from .. import app, util
@@ -75,6 +76,23 @@ class BaseBehavior(object):
                 return statistics.mean(values)
         else:
             return None
+
+
+def get_behaviors():
+    """Return a list of all behavior IDs (i.e. name of classes extending BaseBehavior)."""
+    behaviors = []
+    package = importlib.import_module('.', package=__name__)
+    prefix = package.__name__ + "."
+    for importer, modname, ispkg in pkgutil.iter_modules(package.__path__, prefix):
+        module = __import__(modname, fromlist=["*"])
+        for member in dir(module):
+            cls = getattr(module, member)
+            try:
+                if cls != BaseBehavior and issubclass(cls, BaseBehavior):
+                    behaviors.append(modname[len(prefix):] + '.' + member)
+            except TypeError:
+                pass
+    return behaviors
 
 
 def get_behavior_handler_class(behavior_id: str):

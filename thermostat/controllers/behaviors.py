@@ -5,7 +5,7 @@ from sanic.request import Request
 from sanic.response import json
 
 from .. import app, errors
-from ..behaviors import get_behavior_handler_class
+from ..behaviors import get_behavior_handler_class, get_behaviors
 
 BEHAVIOR_ID_PREFIX = 'thermostat.behaviors.'
 
@@ -28,8 +28,13 @@ def serialize_behavior(bcls):
 @app.get('/behaviors')
 async def index(request: Request):
     """List all available behaviors."""
-    # TODO
-    raise errors.NotSupportedError('Not implemented.')
+    behaviors = []
+    for behavior_id in get_behaviors():
+        handler_class = get_behavior_handler_class(behavior_id)
+        if not handler_class:
+            raise errors.NotFoundError('Behavior not found.')
+        behaviors.append(serialize_behavior(handler_class))
+    return json(behaviors)
 
 
 # noinspection PyUnusedLocal
