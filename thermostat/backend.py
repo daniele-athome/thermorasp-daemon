@@ -38,7 +38,10 @@ class TimerNode(object):
     async def _loop(self):
         while app.is_running:
             await asyncio.sleep(self.seconds)
-            await self.broker.publish(self.topic, b'timer', retain=False)
+            await self.trigger()
+
+    async def trigger(self):
+        await self.broker.publish(self.topic, b'timer', retain=False)
 
 
 class Backend(object):
@@ -105,29 +108,24 @@ class Backend(object):
             if self.schedule:
                 await self.schedule.timer()
 
-    # TODO
-    async def update_operating_pipeline(self, behaviors):
-        """Updates the current operating pipeline instance with new behaviors. Used for temporary alterations."""
-        with await self.pipeline_lock:
-            if self.pipeline:
-                self.pipeline.update(behaviors)
-                self.pipeline.set_context(self.event_logger, self.devices, self.sensors.get_last_readings_summary())
-                self.pipeline.run()
+    async def update_operating_schedule(self, behaviors):
+        """Updates the current operating schedule instance with new behaviors. Used for temporary alterations."""
+        with await self.schedule_lock:
+            if self.schedule:
+                if await self.schedule.update(behaviors):
+                    await self.timer.trigger()
 
-    # TODO
-    async def update_operating_behavior(self, behavior_order, config):
-        """Updates the configuration of a behavior in the current operating pipeline Used for temporary alterations."""
-        with await self.pipeline_lock:
-            if self.pipeline:
-                self.pipeline.update_config(behavior_order, config)
-                self.pipeline.set_context(self.event_logger, self.devices, self.sensors.get_last_readings_summary())
-                self.pipeline.run()
+    async def update_operating_behavior(self, behavior_id, config):
+        """Updates the configuration of a behavior in the current operating schedule. Used for temporary alterations."""
+        with await self.schedule_lock:
+            if self.schedule:
+                if await self.schedule.update_behavior(behavior_id, config):
+                    await self.timer.trigger()
 
     async def set_operating_schedule(self, schedule_id):
         with await self.schedule_lock:
-            if schedule_id is None:
-                self.cancel_current_schedule()
-            else:
+            self.cancel_current_schedule()
+            if schedule_id is not None:
                 schedule = self.get_schedule(schedule_id)
                 if schedule:
                     log.debug("Activating schedule #{} - {}".format(schedule['id'], schedule['name']))

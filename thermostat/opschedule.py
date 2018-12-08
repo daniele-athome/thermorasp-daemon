@@ -23,6 +23,7 @@ class OperatingSchedule(object):
         self.sensors = sensors
         self.devices = devices
         self.schedule = schedule
+        # ensure lock between start and stop behavior methods
         self.behavior_lock = asyncio.Lock()
         # the currently running behavior (BaseBehavior instance)
         self.behavior = None
@@ -44,6 +45,39 @@ class OperatingSchedule(object):
         if self.behavior:
             await self.stop_behavior()
         await self.broker.disconnect()
+
+    async def update(self, behaviors):
+        """Return true if something has changed in a currently running behavior."""
+        if self.behavior:
+            await self.stop_behavior()
+            self.schedule['behaviors'] = behaviors
+            return True
+        return False
+
+    async def update_behavior(self, behavior_id: int, config: dict):
+        """Return true if something has changed in a currently running behavior."""
+        restart = False
+        if self.behavior and self.behavior.id == behavior_id:
+            restart = True
+            # we are modifying the current behavior
+            await self.stop_behavior()
+
+        behavior_def = self.get_behavior(behavior_id)
+        if behavior_def:
+            if 'order' in config:
+                behavior_def['order'] = config['order']
+            if 'start_time' in config:
+                behavior_def['start_time'] = config['start_time']
+            if 'end_time' in config:
+                behavior_def['end_time'] = config['end_time']
+            if 'config' in config:
+                behavior_def['config'] = config['config']
+            if 'sensors' in config:
+                behavior_def['sensors'] = config['sensors']
+            if 'devices' in config:
+                behavior_def['devices'] = config['devices']
+
+        return restart
 
     async def timer(self):
         """Called by the backend when the timer ticks."""
@@ -179,6 +213,9 @@ class OperatingSchedule(object):
     def delete_behavior(self, behavior_def):
         """Remove the given behavior from our schedule."""
         self.schedule['behaviors'].remove(behavior_def)
+
+    def get_behavior(self, behavior_id):
+        return next(b for b in self.schedule.behaviors if b['id'] == behavior_id)
 
     @staticmethod
     def get_time_minutes(weekday, hour, minute):

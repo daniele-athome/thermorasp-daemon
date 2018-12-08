@@ -71,3 +71,55 @@ async def active(request: Request):
         raise errors.NotFoundError('No active schedule.')
 
     return json(app.backend.schedule.schedule)
+
+
+# noinspection PyUnusedLocal
+@app.put('/schedules/active')
+async def update_active(request: Request):
+    """Alter the active schedule without persisting anything to the database."""
+
+    if app.backend.schedule is None:
+        raise errors.NotFoundError('No active schedule.')
+
+    data = request.json
+    if 'behaviors' in data:
+        await app.backend.update_operating_schedule(data['behaviors'])
+
+    return no_content()
+
+
+# noinspection PyUnusedLocal
+@app.put('/schedules/active/<behavior_id:int>')
+async def update_config_active(request: Request, behavior_id: int):
+    """Alter a single behavior in the active schedule without persisting anything to the database."""
+
+    if app.backend.schedule is None:
+        raise errors.NotFoundError('No active schedule.')
+
+    data = request.json
+    await app.backend.update_operating_behavior(behavior_id, data)
+
+    return no_content()
+
+
+# noinspection PyUnusedLocal
+@app.put('/schedules/active/rollback')
+async def rollback_active(request: Request):
+    """Rollback any modification to the active schedule."""
+
+    if app.backend.schedule is None:
+        raise errors.NotFoundError('No active schedule.')
+
+    # reload the same
+    await app.backend.set_operating_schedule(app.backend.schedule.id)
+
+    return no_content()
+
+
+# noinspection PyUnusedLocal
+@app.put('/schedules/active/commit')
+async def commit_active(request: Request):
+    """Persist the active schedule to the database."""
+
+    # TODO might be implemented using create
+    raise errors.NotSupportedError('Not implemented yet.')
