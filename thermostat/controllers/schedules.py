@@ -117,15 +117,6 @@ async def rollback_active(request: Request):
 
 
 # noinspection PyUnusedLocal
-@app.put('/schedules/active/commit')
-async def commit_active(request: Request):
-    """Persist the active schedule to the database."""
-
-    # TODO might be implemented using create
-    raise errors.NotSupportedError('Not implemented yet.')
-
-
-# noinspection PyUnusedLocal
 @app.post('/schedules')
 async def create(request: Request):
     """Creates a schedule."""
