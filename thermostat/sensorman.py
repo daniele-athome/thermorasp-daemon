@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """The Sensor Manager."""
 
-import logging
 import asyncio
 import json
 import sqlalchemy.exc
 
+from sanic.log import logger
 from sqlalchemy.orm.exc import NoResultFound
 
 import hbmqtt.client as mqtt_client
@@ -15,10 +15,6 @@ from .database import scoped_session
 from . import app
 from .models import Sensor, Reading
 from .sensors import get_sensor_handler
-
-
-# TEST loggers
-log = logging.getLogger("root")
 
 
 class SensorManager(object):
@@ -44,7 +40,7 @@ class SensorManager(object):
 
     async def _connect(self):
         await self.broker.connect(app.broker_url)
-        log.debug("Sensor Manager connected to broker")
+        logger.info("Sensor Manager connected to broker")
         self.connected = True
         for sensor_instance in self.sensors.values():
             self.sensors_subs[sensor_instance.id] = \
@@ -76,14 +72,14 @@ class SensorManager(object):
 
     async def _subscribe_and_startup_sensor(self, sensor_instance):
         await self.broker.subscribe([(sensor_instance.topic + '/+', mqtt_client.QOS_0)])
-        log.debug("SENSORMANAGER subscribed to " + sensor_instance.topic + '/+')
+        logger.debug("SENSORMANAGER subscribed to " + sensor_instance.topic + '/+')
         sensor_instance.startup()
         await self._listen_sensor(sensor_instance)
 
     async def _listen_sensor(self, sensor_instance):
         while app.is_running and sensor_instance.is_running:
             message = await self.broker.deliver_message()
-            log.debug("SENSORMANAGER topic={}, payload={}".format(message.topic, message.data))
+            logger.debug("SENSORMANAGER topic={}, payload={}".format(message.topic, message.data))
             if message.topic.startswith(sensor_instance.topic):
                 topic = message.topic.split('/')
                 sensor_type = topic[-1]
@@ -92,7 +88,6 @@ class SensorManager(object):
                     continue
 
                 data = json.loads(message.data.decode())
-                log.debug(data)
                 reading_timestamp = parse_date(data['timestamp'])
                 # store reading in database
                 try:
@@ -155,7 +150,7 @@ class SensorManager(object):
         """Returns a dict with the last readings from all sensors."""
         last = {}
         for sensor_id, reading in self.readings.items():
-            log.debug("sensor_id: " + sensor_id + ", reading: " + str(reading))
+            logger.debug("sensor_id: " + sensor_id + ", reading: " + str(reading))
             if sensor_type is not None and sensor_type != reading['type']:
                 continue
 

@@ -2,15 +2,13 @@
 """Sensors communication protocols."""
 
 import asyncio
-import logging
 import json
 import importlib
 import hbmqtt.client as mqtt_client
 
-from .. import app
+from sanic.log import logger
 
-# TEST loggers
-log = logging.getLogger("root")
+from .. import app
 
 
 class BaseSensorHandler(object):
@@ -27,12 +25,13 @@ class BaseSensorHandler(object):
 
     async def _connect(self):
         await self.broker.connect(app.broker_url)
+        logger.info("Sensor " + self.id + " connected to broker")
         await self.connected()
         # TODO what do we control here?
         await self.broker.subscribe([(self.topic + '/control', mqtt_client.QOS_0)])
         while self.is_running:
             message = await self.broker.deliver_message()
-            log.debug(self.id + " SENSOR topic={}, payload={}".format(message.topic, message.data))
+            logger.debug(self.id + " SENSOR topic={}, payload={}".format(message.topic, message.data))
             await self.message(message.data.decode())
 
     async def _disconnect(self):

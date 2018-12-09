@@ -3,18 +3,16 @@
 
 import json
 import asyncio
-import logging
 import datetime
 import functools
 import hbmqtt.client as mqtt_client
+
+from sanic.log import logger
 
 from . import app
 from .sensorman import SensorManager
 from .deviceman import DeviceManager
 from .behaviors import SelfDestructError, BaseBehavior, get_behavior_handler
-
-# TEST loggers
-log = logging.getLogger("root")
 
 
 class OperatingSchedule(object):
@@ -38,7 +36,7 @@ class OperatingSchedule(object):
         """Starts scheduling operations."""
         self.is_running = True
         await self.broker.connect(app.broker_url)
-        log.debug("Operating schedule connected to broker")
+        logger.info("Operating schedule connected to broker")
 
     async def shutdown(self):
         self.is_running = False
@@ -84,23 +82,23 @@ class OperatingSchedule(object):
         now = datetime.datetime.now()
         now_min = self.get_time_minutes(now.weekday(), now.hour, now.minute)
         behavior_def = self.find_current_behavior(now_min)
-        log.debug("Current behavior for minute {}: {}".format(now_min, behavior_def))
+        logger.debug("Current behavior for minute {}: {}".format(now_min, behavior_def))
 
         # no behavior running or different from previous one
         if self.behavior is not None and (behavior_def is None or self.behavior.id != behavior_def['id']):
-            log.debug("Shutting down old behavior")
+            logger.debug("Shutting down old behavior")
             await self.stop_behavior()
 
         if self.behavior is None:
             # new behavior to start!
             if behavior_def is not None:
-                log.debug("Generating new behavior")
+                logger.debug("Generating new behavior")
                 await self.start_behavior(behavior_def)
             else:
-                log.debug("No behavior found!")
+                logger.debug("No behavior found!")
         else:
             # behavior already running, wake it up
-            log.debug("Pinging behavior")
+            logger.debug("Pinging behavior")
             # noinspection PyAsyncCall
             asyncio.ensure_future(self.behavior.timer()).add_done_callback(self._future_result)
 
@@ -118,7 +116,7 @@ class OperatingSchedule(object):
                 self.behavior = behavior
                 self.behavior_sub = asyncio.ensure_future(self.subscribe_for_behavior(behavior))
             except SelfDestructError:
-                log.debug("Behavior self-destructed during startup")
+                logger.debug("Behavior self-destructed during startup")
                 self.delete_behavior(behavior_def)
 
     async def stop_behavior(self):
@@ -142,7 +140,7 @@ class OperatingSchedule(object):
             try:
                 await self.behavior.shutdown()
             except SelfDestructError:
-                log.debug("Behavior self-destructed during shutdown")
+                logger.debug("Behavior self-destructed during shutdown")
                 self.delete_behavior(self.behavior_def)
             self.behavior = None
             self.behavior_def = None
@@ -152,18 +150,18 @@ class OperatingSchedule(object):
         # subscribe to required sensors
         for sensor_id in self.behavior_def['sensors']:
             sensor = self.sensors[sensor_id]
-            log.debug("SCHEDULE subscribing to sensor {}".format(sensor.topic))
+            logger.debug("SCHEDULE subscribing to sensor {}".format(sensor.topic))
             await self.broker.subscribe([(sensor.topic + '/+', mqtt_client.QOS_0)])
 
         # subscribe to required devices
         for device_id in self.behavior_def['devices']:
             device = self.devices[device_id]
-            log.debug("SCHEDULE subscribing to device {}".format(device.topic))
+            logger.debug("SCHEDULE subscribing to device {}".format(device.topic))
             await self.broker.subscribe([(device.topic + '/+', mqtt_client.QOS_0)])
 
         while self.is_running and self.behavior_def:
             message = await self.broker.deliver_message()
-            log.debug("SCHEDULE topic={}, payload={}".format(message.topic, message.data))
+            logger.debug("SCHEDULE topic={}, payload={}".format(message.topic, message.data))
 
             # callback calls must be detached from our flow
 
@@ -182,7 +180,7 @@ class OperatingSchedule(object):
         try:
             task.result()
         except SelfDestructError:
-            log.debug("Behavior self-destructed")
+            logger.debug("Behavior self-destructed")
             task.exception()
             asyncio.ensure_future(self.stop_behavior()) \
                 .add_done_callback(functools.partial(self._delete_behavior, behavior_def=self.behavior_def))

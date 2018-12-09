@@ -1,17 +1,11 @@
 # -*- coding: utf-8 -*-
 """The Sensor Manager."""
 
-import logging
-
 from sqlalchemy.orm.exc import NoResultFound
 
 from . import devices
 from .database import scoped_session
 from .models import Device
-
-
-# TEST loggers
-log = logging.getLogger("root")
 
 
 class DeviceManager(object):

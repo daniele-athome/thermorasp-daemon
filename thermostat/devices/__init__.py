@@ -3,15 +3,13 @@
 
 import json
 import asyncio
-import logging
 import importlib
 import hbmqtt.client as mqtt_client
 
+from sanic.log import logger
+
 from .. import app
 from ..errors import NotSupportedError
-
-# TEST loggers
-log = logging.getLogger("root")
 
 
 class BaseDeviceHandler(object):
@@ -35,12 +33,12 @@ class BaseDeviceHandler(object):
 
     async def _connect(self):
         await self.broker.connect(app.broker_url)
-        log.debug("Device " + self.id + " connected to broker")
+        logger.info("Device " + self.id + " connected to broker")
         await self.connected()
         await self.broker.subscribe([(self.topic + '/control', mqtt_client.QOS_2)])
         while self.is_running:
             message = await self.broker.deliver_message()
-            log.debug(self.id + " DEVICE topic={}, payload={}".format(message.topic, message.data))
+            logger.debug(self.id + " DEVICE topic={}, payload={}".format(message.topic, message.data))
             await self.control(json.loads(message.data.decode()))
 
     async def _disconnect(self):

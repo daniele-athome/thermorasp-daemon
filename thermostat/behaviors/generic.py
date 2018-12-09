@@ -1,16 +1,13 @@
 # -*- coding: utf-8 -*-
 """General purpose behaviors."""
 
-import logging
 import hbmqtt.client as mqtt_client
+
+from sanic.log import logger
 
 from . import BaseBehavior
 from .. import app
 from ..models import eventlog
-
-
-# TEST loggers
-log = logging.getLogger("root")
 
 
 class TargetTemperatureBehavior(BaseBehavior):
@@ -54,8 +51,8 @@ class TargetTemperatureBehavior(BaseBehavior):
 
     async def sensor_data(self, topic: str, data: dict):
         await BaseBehavior.sensor_data(self, topic, data)
-        log.debug("TARGET got sensor data from {}: {}".format(topic, data))
-        log.debug("TARGET devices: {}".format(self.devices))
+        logger.debug("TARGET got sensor data from {}: {}".format(topic, data))
+        logger.debug("TARGET devices: {}".format(self.devices))
 
         avg_temp = self.last_reading_avg('celsius')
         if avg_temp is None:
@@ -76,30 +73,4 @@ class TargetTemperatureBehavior(BaseBehavior):
 
     async def device_state(self, topic: str, data: dict):
         await BaseBehavior.device_state(self, topic, data)
-        log.debug("TARGET got device state from {}: {}".format(topic, data))
-
-
-# @deprecated
-def thermostat_control(log_source, context, device_id, target_temperature, cooling=True):
-    """A simple thermostat function to decide wether to activate a device or not."""
-
-    # immediately set the target temperature and device to show
-    context.params['target_temperature'] = target_temperature
-    context.params['target_device'] = device_id
-
-    if 'temperature' not in context.last_reading:
-        context.event_logger.event(eventlog.LEVEL_WARNING, log_source, 'action', 'last reading: (none), unable to proceed')
-        return False
-
-    target_device = context.devices[device_id]
-    last_reading = round(context.last_reading['temperature']['_avg']['value'], 1)
-    target_temperature = round(target_temperature, 1)
-    if cooling:
-        enabled = last_reading > target_temperature
-    else:
-        enabled = last_reading < target_temperature
-    context.event_logger.event(eventlog.LEVEL_INFO, log_source, 'behavior:action',
-                               'last reading: {}, target: {}, enabled: {}'
-                               .format(last_reading, target_temperature, enabled))
-    target_device.control(enabled=enabled)
-    return True
+        logger.debug("TARGET got device state from {}: {}".format(topic, data))

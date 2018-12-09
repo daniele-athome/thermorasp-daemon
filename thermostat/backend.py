@@ -2,21 +2,18 @@
 """The backend process."""
 
 import sys
-import logging
 import asyncio
 import sdnotify
 import json
 
 import hbmqtt.client as mqtt_client
 
+from sanic.log import logger
+
 from .database import scoped_session
 from . import app, sensorman, deviceman, opschedule
 from .models import Sensor, Schedule
 from .models import eventlog
-
-
-# TEST loggers
-log = logging.getLogger("root")
 
 
 class TimerNode(object):
@@ -32,7 +29,7 @@ class TimerNode(object):
     async def _connect(self):
         while app.is_running:
             await self.broker.connect(app.broker_url)
-            log.debug("Timer connected to broker")
+            logger.debug("Timer connected to broker")
             await self._loop()
 
     async def _loop(self):
@@ -66,25 +63,25 @@ class Backend(object):
     async def _connect(self):
         try:
             await self.broker.connect(self.app.broker_url)
-            log.debug("Backend connected to broker")
+            logger.info("Backend connected to broker")
             await self.broker.subscribe([(self.timer.topic, mqtt_client.QOS_0)])
             await self.backend()
             while self.app.is_running:
                 message = await self.broker.deliver_message()
-                log.debug("BROKER topic={}, payload={}".format(message.topic, message.data))
+                logger.debug("BROKER topic={}, payload={}".format(message.topic, message.data))
                 if message.topic == self.timer.topic:
                     if message.data == b'timer':
                         await self.backend()
         except mqtt_client.ClientException:
-            log.debug("Unable to connect to broker! Shutting down.")
+            logger.critical("Unable to connect to broker! Shutting down.")
             app.stop()
 
     async def backend(self):
         try:
-            log.debug("BACKEND RUNNING")
+            logger.debug("BACKEND RUNNING")
             await self.backend_ops()
         except:
-            log.error('Unexpected error:', exc_info=sys.exc_info())
+            logger.error('Unexpected error:', exc_info=sys.exc_info())
             app.eventlog.event_exc(eventlog.LEVEL_ERROR, 'backend', 'exception')
 
     async def backend_ops(self):
@@ -101,7 +98,7 @@ class Backend(object):
 
                     # take only the first one
                     schedule = schedules[0]
-                    log.debug("Activating schedule #{} - {}".format(schedule['id'], schedule['name']))
+                    logger.info("Activating schedule #{} - {}".format(schedule['id'], schedule['name']))
                     self.schedule = opschedule.OperatingSchedule(self.sensors, self.devices, schedule)
                     await self.schedule.startup()
 
@@ -128,7 +125,7 @@ class Backend(object):
             if schedule_id is not None:
                 schedule = self.get_schedule(schedule_id)
                 if schedule:
-                    log.debug("Activating schedule #{} - {}".format(schedule['id'], schedule['name']))
+                    logger.info("Activating schedule #{} - {}".format(schedule['id'], schedule['name']))
                     self.schedule = opschedule.OperatingSchedule(self.sensors, self.devices, schedule)
                     await self.schedule.startup()
 
@@ -187,5 +184,5 @@ async def init_backend(sanic, loop):
         n = sdnotify.SystemdNotifier()
         n.notify("READY=1")
     except:
-        log.error('Unexpected error:', exc_info=sys.exc_info())
+        logger.critical('Unexpected error:', exc_info=1)
         sanic.stop()

@@ -1,15 +1,11 @@
 # -*- coding: utf-8 -*-
 """Sensors API."""
 
-import logging
-
 from sanic.request import Request
 from sanic.response import json
 
 from .. import app, errors
 
-# TEST loggers
-log = logging.getLogger("root")
 
 SENSOR_STATUS_MAP = (
     'unknown',

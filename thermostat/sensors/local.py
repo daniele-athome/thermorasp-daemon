@@ -4,7 +4,6 @@
 import datetime
 import asyncio
 import os
-import logging
 from random import randint
 import urllib.parse as urllib_parse
 
@@ -22,10 +21,6 @@ os.environ['W1THERMSENSOR_NO_KERNEL_MODULE'] = '1'
 from w1thermsensor import W1ThermSensor
 
 from . import BaseSensorHandler
-
-
-# TEST loggers
-log = logging.getLogger("root")
 
 
 class RandomSensorHandler(BaseSensorHandler):

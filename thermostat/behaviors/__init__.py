@@ -2,17 +2,12 @@
 """Smart automation behaviors."""
 
 import json
-import logging
 import statistics
 import importlib
 import pkgutil
 import hbmqtt.client as mqtt_client
 
 from .. import app, util
-
-
-# TEST loggers
-log = logging.getLogger("root")
 
 
 class SelfDestructError(Exception):
