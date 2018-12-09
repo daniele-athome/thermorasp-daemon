@@ -123,3 +123,118 @@ async def commit_active(request: Request):
 
     # TODO might be implemented using create
     raise errors.NotSupportedError('Not implemented yet.')
+
+
+# noinspection PyUnusedLocal
+@app.post('/schedules')
+async def create(request: Request):
+    """Creates a schedule."""
+
+    data = request.json
+    new_id = None
+    new_enabled = False
+    with scoped_session(app.database) as session:
+        sched = Schedule()
+        sched.name = data['name']
+        if 'description' in data:
+            sched.description = data['description']
+        if 'enabled' in data:
+            sched.enabled = data['enabled']
+        if 'behaviors' in data:
+            sched.behaviors = []
+            for data_behavior in data['behaviors']:
+                beh = Behavior()
+                beh.behavior_name = data_behavior['name']
+                beh.behavior_order = data_behavior['order']
+                beh.start_time = data_behavior['start']
+                beh.end_time = data_behavior['end']
+                beh.config = json_dumps(data_behavior['config'])
+                if 'sensors' in data_behavior:
+                    beh.sensors = data_behavior['sensors']
+                if 'devices' in data_behavior:
+                    beh.devices = data_behavior['devices']
+                sched.behaviors.append(beh)
+        session.add(sched)
+        session.flush()
+        new_enabled = sched.enabled
+        new_id = sched.id
+
+        if new_enabled:
+            # deactivate all other schedules
+            session.query(Schedule).filter(Schedule.id != new_id).update({'enabled': False})
+
+    # enable immediately if requested
+    if new_enabled:
+        await app.backend.set_operating_schedule(new_id)
+
+    return json({'id': new_id}, 201)
+
+
+# noinspection PyUnusedLocal
+@app.delete('/schedules/<schedule_id:int>')
+async def delete(request: Request, schedule_id: int):
+    """Deletes a schedule."""
+
+    if app.backend.schedule and app.backend.schedule.id == schedule_id:
+        # deactivate if active
+        await app.backend.set_operating_schedule(None)
+
+    with scoped_session(app.database) as session:
+        try:
+            session.query(Schedule).filter(Schedule.id == schedule_id).delete()
+            return no_content()
+        except NoResultFound:
+            raise errors.NotFoundError('Schedule not found.')
+
+
+# noinspection PyUnusedLocal
+@app.put('/schedules/<schedule_id:int>')
+async def update(request: Request, schedule_id: int):
+    """Updates a schedule."""
+
+    data = request.json
+    new_enabled = False
+    with scoped_session(app.database) as session:
+        try:
+            sched = session.query(Schedule).filter(Schedule.id == schedule_id).one()
+            if app.backend.schedule and app.backend.schedule.id == schedule_id:
+                new_enabled = sched.enabled
+
+            if 'name' in data:
+                sched.name = data['name']
+            if 'description' in data:
+                sched.description = data['description']
+            if 'enabled' in data:
+                sched.enabled = data['enabled']
+                if sched.enabled:
+                    new_enabled = True
+
+            if 'behaviors' in data:
+                # delete all behaviors first
+                session.query(Behavior).filter(Behavior.schedule_id == schedule_id).delete()
+
+                sched.behaviors = []
+                for data_behavior in data['behaviors']:
+                    beh = Behavior()
+                    beh.behavior_name = data_behavior['name']
+                    beh.behavior_order = data_behavior['order']
+                    beh.start_time = data_behavior['start']
+                    beh.end_time = data_behavior['end']
+                    beh.config = json_dumps(data_behavior['config'])
+                    sched.behaviors.append(beh)
+            session.add(sched)
+
+            if new_enabled:
+                # deactivate all other pipelines
+                session.query(Schedule).filter(Schedule.id != schedule_id).update({'enabled': False})
+
+        except NoResultFound:
+            raise errors.NotFoundError('Schedule not found.')
+
+    # enable immediately if requested
+    if new_enabled:
+        await app.backend.set_operating_schedule(schedule_id)
+    elif app.backend.pipeline and app.backend.schedule.id == schedule_id:
+        await app.backend.set_operating_schedule(None)
+
+    return no_content()
