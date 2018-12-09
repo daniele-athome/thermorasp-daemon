@@ -9,6 +9,8 @@ import uvloop
 from signal import signal, SIGINT, SIGTERM
 from argparse import ArgumentParser
 
+from sanic_cors import CORS
+
 from thermostat import app, database, eventlog
 
 parser = ArgumentParser(__doc__)
@@ -19,6 +21,9 @@ parser.add_argument('-d', '--debug', action='store_true', help='enable debug')
 args = parser.parse_args()
 
 app.config.from_pyfile(args.config)
+
+if args.debug:
+    CORS(app)
 
 app.broker_url = 'mqtt://' + app.config['BROKER_HOST'] + ':' + str(app.config['BROKER_PORT']) + '/'
 app.default_sensors_validity = app.config['SENSORS_VALIDITY']
