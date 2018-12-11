@@ -74,6 +74,19 @@ async def active(request: Request):
 
 
 # noinspection PyUnusedLocal
+@app.get('/schedules/active/behavior')
+async def active(request: Request):
+    """Get the active behavior."""
+
+    if app.backend.schedule is None:
+        raise errors.NotFoundError('No active schedule.')
+    if app.backend.schedule.behavior_def is None:
+        raise errors.NotFoundError('No active behavior.')
+
+    return json(app.backend.schedule.behavior_def)
+
+
+# noinspection PyUnusedLocal
 @app.put('/schedules/active')
 async def update_active(request: Request):
     """Alter the active schedule without persisting anything to the database."""
@@ -111,7 +124,7 @@ async def rollback_active(request: Request):
         raise errors.NotFoundError('No active schedule.')
 
     # reload the same
-    await app.backend.set_operating_schedule(app.backend.schedule.id)
+    await app.backend.set_operating_schedule(app.backend.schedule.schedule['id'])
 
     return no_content()
 

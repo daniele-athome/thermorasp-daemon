@@ -47,6 +47,14 @@ async def index(request: Request):
     return json([serialize_sensor(d) for d in app.backend.sensors.values()])
 
 
+# noinspection PyUnusedLocal
+@app.get('/sensors/topic/<sensor_id>')
+async def topic(request: Request, sensor_id: str):
+    """Get the base topic for a given sensor."""
+
+    return json(app.backend.sensors[sensor_id].topic)
+
+
 @app.post('/sensors/register')
 async def register(request: Request):
     """

@@ -23,7 +23,7 @@ args = parser.parse_args()
 app.config.from_pyfile(args.config)
 
 if args.debug:
-    CORS(app)
+    CORS(app, automatic_options=True)
 
 app.broker_url = 'mqtt://' + app.config['BROKER_HOST'] + ':' + str(app.config['BROKER_PORT']) + '/'
 app.default_sensors_validity = app.config['SENSORS_VALIDITY']
