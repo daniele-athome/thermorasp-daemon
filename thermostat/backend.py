@@ -121,7 +121,7 @@ class Backend(object):
 
     async def set_operating_schedule(self, schedule_id):
         with await self.schedule_lock:
-            self.cancel_current_schedule()
+            await self.cancel_current_schedule()
             if schedule_id is not None:
                 schedule = self.get_schedule(schedule_id)
                 if schedule:
@@ -129,9 +129,9 @@ class Backend(object):
                     self.schedule = opschedule.OperatingSchedule(self.sensors, self.devices, schedule)
                     await self.schedule.startup()
 
-    def cancel_current_schedule(self):
+    async def cancel_current_schedule(self):
         if self.schedule:
-            self.schedule.shutdown()
+            await self.schedule.shutdown()
             self.schedule = None
 
     def get_passive_sensors(self):
