@@ -116,6 +116,20 @@ async def update_config_active(request: Request, behavior_id: int):
 
 
 # noinspection PyUnusedLocal
+@app.post('/schedules/active/volatile')
+async def set_active_volatile(request: Request):
+    """
+    Activate a new volatile behavior that overrides the current one.
+    The behavior will be discarded when it goes out of time range.
+    """
+
+    data = request.json
+    await app.backend.set_volatile_behavior(data)
+
+    return no_content()
+
+
+# noinspection PyUnusedLocal
 @app.put('/schedules/active/rollback')
 async def rollback_active(request: Request):
     """Rollback any modification to the active schedule."""

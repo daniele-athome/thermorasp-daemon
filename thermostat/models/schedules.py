@@ -4,7 +4,7 @@
 from sqlalchemy import (
     Column, String, Integer, SmallInteger, Boolean, ForeignKey
 )
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship
 
 from . import Base
 

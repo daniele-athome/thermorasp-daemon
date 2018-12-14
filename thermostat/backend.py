@@ -129,6 +129,24 @@ class Backend(object):
                     self.schedule = opschedule.OperatingSchedule(self.sensors, self.devices, schedule)
                     await self.schedule.startup()
 
+    async def set_volatile_behavior(self, behavior_def):
+        with await self.schedule_lock:
+            # special id for temporary behavior
+            behavior_def['id'] = 0
+
+            logger.debug("Setting volatile behavior: {}".format(behavior_def))
+            if not self.schedule:
+                logger.debug("Creating volatile schedule")
+                self.schedule = opschedule.OperatingSchedule(self.sensors, self.devices,
+                                                             self.create_temp_schedule(behavior_def))
+                await self.schedule.startup()
+            else:
+                # update current volatile behavior or add one
+                logger.debug("Updating current schedule")
+                await self.schedule.update_behavior(0, behavior_def)
+                await self.timer.trigger()
+            logger.debug("Schedule: {}".format(self.schedule.schedule))
+
     async def cancel_current_schedule(self):
         if self.schedule:
             await self.schedule.shutdown()
@@ -145,6 +163,16 @@ class Backend(object):
                     .filter(Schedule.enabled == 1)
                     .order_by(Schedule.id)
                     .all()]
+
+    def create_temp_schedule(self, behavior_def):
+        # special id for temporary behaviors
+        behavior_def['id'] = 0
+        return {
+            'id': -1,
+            'name': 'Temporary schedule',
+            'description': 'Temporary schedule',
+            'behaviors': [behavior_def]
+        }
 
     def get_schedule(self, schedule_id):
         with scoped_session(self.app.database) as session:

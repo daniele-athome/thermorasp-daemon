@@ -54,6 +54,7 @@ class OperatingSchedule(object):
 
     async def update_behavior(self, behavior_id: int, config: dict):
         """Return true if something has changed in a currently running behavior."""
+        logger.info("Updating behavior with config: {}".format(config))
         restart = False
         if self.behavior and self.behavior.id == behavior_id:
             restart = True
@@ -61,7 +62,11 @@ class OperatingSchedule(object):
             await self.stop_behavior()
 
         behavior_def = self.get_behavior(behavior_id)
-        if behavior_def:
+        if not behavior_def and not behavior_id:
+            behavior_def = config
+            behavior_def['id'] = 0
+            self.schedule['behaviors'].append(behavior_def)
+        else:
             if 'order' in config:
                 behavior_def['order'] = config['order']
             if 'start_time' in config:
@@ -75,7 +80,7 @@ class OperatingSchedule(object):
             if 'devices' in config:
                 behavior_def['devices'] = config['devices']
 
-        return restart
+        return restart or not behavior_id
 
     async def timer(self):
         """Called by the backend when the timer ticks."""
@@ -127,15 +132,17 @@ class OperatingSchedule(object):
             try:
                 await self.behavior_sub
             except asyncio.CancelledError:
-                pass
+                logger.exception("SCHEDULE subscription cancelled!")
 
             sensor_topics = self.get_sensor_topics()
+            logger.info("SCHEDULE will unsubscribe from sensors: {}".format(sensor_topics))
             if sensor_topics:
-                await self.broker.unsubscribe(sensor_topics)
+                await self.broker.unsubscribe([topic + '/+' for topic in sensor_topics])
 
             device_topics = self.get_device_topics()
+            logger.info("SCHEDULE will unsubscribe from devices: {}".format(device_topics))
             if device_topics:
-                await self.broker.unsubscribe(device_topics)
+                await self.broker.unsubscribe([topic + '/+' for topic in device_topics])
 
             try:
                 await self.behavior.shutdown()
@@ -152,6 +159,8 @@ class OperatingSchedule(object):
             sensor = self.sensors[sensor_id]
             logger.debug("SCHEDULE subscribing to sensor {}".format(sensor.topic))
             await self.broker.subscribe([(sensor.topic + '/+', mqtt_client.QOS_0)])
+            # subscribe twice - hbmqtt bug or our own bug
+            await self.broker.subscribe([(sensor.topic + '/+', mqtt_client.QOS_0)])
 
         # subscribe to required devices
         for device_id in self.behavior_def['devices']:
@@ -160,6 +169,7 @@ class OperatingSchedule(object):
             await self.broker.subscribe([(device.topic + '/+', mqtt_client.QOS_0)])
 
         while self.is_running and self.behavior_def:
+            logger.debug("SCHEDULE waiting for message...")
             message = await self.broker.deliver_message()
             logger.debug("SCHEDULE topic={}, payload={}".format(message.topic, message.data))
 
@@ -175,6 +185,8 @@ class OperatingSchedule(object):
                 # noinspection PyAsyncCall
                 asyncio.ensure_future(behavior.device_state(message.topic, json.loads(message.data))) \
                        .add_done_callback(self._future_result)
+
+        logger.debug("SCHEDULE quitting subscriptions")
 
     def _future_result(self, task: asyncio.Future):
         try:
@@ -213,7 +225,7 @@ class OperatingSchedule(object):
         self.schedule['behaviors'].remove(behavior_def)
 
     def get_behavior(self, behavior_id):
-        return next(b for b in self.schedule.behaviors if b['id'] == behavior_id)
+        return next((b for b in self.schedule['behaviors'] if b['id'] == behavior_id), None)
 
     @staticmethod
     def get_time_minutes(weekday, hour, minute):

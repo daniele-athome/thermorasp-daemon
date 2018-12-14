@@ -21,6 +21,7 @@ def serialize_device(device):
         'protocol': device.protocol,
         'address': ':'.join(device.address),
         'type': device.type,
+        'topic': device.topic,
     }
 
 

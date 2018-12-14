@@ -49,15 +49,28 @@ class TargetTemperatureBehavior(BaseBehavior):
     async def update(self, config):
         self._init(config)
 
+    async def timer(self):
+        logger.debug("TARGET got timer")
+        await self._logic()
+
     async def sensor_data(self, topic: str, data: dict):
         await BaseBehavior.sensor_data(self, topic, data)
         logger.debug("TARGET got sensor data from {}: {}".format(topic, data))
         logger.debug("TARGET devices: {}".format(self.devices))
+        await self._logic()
 
+    async def device_state(self, topic: str, data: dict):
+        await BaseBehavior.device_state(self, topic, data)
+        logger.debug("TARGET got device state from {}: {}".format(topic, data))
+
+    async def _logic(self):
         avg_temp = self.last_reading_avg('celsius')
         if avg_temp is None:
+            logger.warning("TARGET no average temperature")
             app.eventlog.event(eventlog.LEVEL_WARNING, self.name, 'action', 'last reading: (none), unable to proceed')
             return
+
+        logger.debug("TARGET average temperature: {}".format(avg_temp))
 
         last_reading = round(avg_temp, 1)
         target_temperature = round(self.target_temperature, 1)
@@ -70,7 +83,3 @@ class TargetTemperatureBehavior(BaseBehavior):
                            .format(last_reading, target_temperature, enabled))
         for device in self.devices:
             await self.control_device(device, {'enabled': enabled})
-
-    async def device_state(self, topic: str, data: dict):
-        await BaseBehavior.device_state(self, topic, data)
-        logger.debug("TARGET got device state from {}: {}".format(topic, data))

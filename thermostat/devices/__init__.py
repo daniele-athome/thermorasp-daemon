@@ -69,7 +69,7 @@ class BaseDeviceHandler(object):
         raise NotImplementedError()
 
     async def publish_state(self, data):
-        self.broker.publish(self.topic + '/state', json.dumps(data).encode())
+        await self.broker.publish(self.topic + '/state', json.dumps(data).encode(), retain=True)
 
     def is_supported(self, device_type):
         return device_type in self.SUPPORTED_TYPES
