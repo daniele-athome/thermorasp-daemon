@@ -132,15 +132,13 @@ class OperatingSchedule(object):
             try:
                 await self.behavior_sub
             except asyncio.CancelledError:
-                logger.exception("SCHEDULE subscription cancelled!")
+                pass
 
             sensor_topics = self.get_sensor_topics()
-            logger.info("SCHEDULE will unsubscribe from sensors: {}".format(sensor_topics))
             if sensor_topics:
                 await self.broker.unsubscribe([topic + '/+' for topic in sensor_topics])
 
             device_topics = self.get_device_topics()
-            logger.info("SCHEDULE will unsubscribe from devices: {}".format(device_topics))
             if device_topics:
                 await self.broker.unsubscribe([topic + '/+' for topic in device_topics])
 
@@ -169,7 +167,6 @@ class OperatingSchedule(object):
             await self.broker.subscribe([(device.topic + '/+', mqtt_client.QOS_0)])
 
         while self.is_running and self.behavior_def:
-            logger.debug("SCHEDULE waiting for message...")
             message = await self.broker.deliver_message()
             logger.debug("SCHEDULE topic={}, payload={}".format(message.topic, message.data))
 
@@ -185,8 +182,6 @@ class OperatingSchedule(object):
                 # noinspection PyAsyncCall
                 asyncio.ensure_future(behavior.device_state(message.topic, json.loads(message.data))) \
                        .add_done_callback(self._future_result)
-
-        logger.debug("SCHEDULE quitting subscriptions")
 
     def _future_result(self, task: asyncio.Future):
         try:
