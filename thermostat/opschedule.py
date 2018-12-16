@@ -48,9 +48,15 @@ class OperatingSchedule(object):
         """Return true if something has changed in a currently running behavior."""
         if self.behavior:
             await self.stop_behavior()
-            self.schedule['behaviors'] = behaviors
-            return True
-        return False
+
+        # assign indexes to behaviors
+        index = 0
+        for bev in behaviors:
+            index += 1
+            bev['id'] = index
+
+        self.schedule['behaviors'] = behaviors
+        return True
 
     async def update_behavior(self, behavior_id: int, config: dict):
         """Return true if something has changed in a currently running behavior."""
