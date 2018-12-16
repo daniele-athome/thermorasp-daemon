@@ -100,14 +100,14 @@ class TargetTemperatureBehaviorTest(BaseTest, unittest.TestCase):
 
         message = yield from client.deliver_message()
         if any(message.topic.startswith(topic) for topic in self.sensors):
-            yield from behavior.sensor_data(message.topic, json.loads(message.data))
+            yield from behavior.sensor_data(message.topic, json.loads(message.data.decode()))
         elif any(message.topic.startswith(topic) for topic in self.devices):
-            yield from behavior.device_state(message.topic, json.loads(message.data))
+            yield from behavior.device_state(message.topic, json.loads(message.data.decode()))
         else:
             self.fail('No sensor or device data received.')
 
         # behavior should have sent control command
         message = yield from client.deliver_message()
         self.assertEqual(message.topic, self.devices[0] + '/control')
-        payload = json.loads(message.data)
+        payload = json.loads(message.data.decode())
         self.assertEqual(payload['enabled'], enabled)

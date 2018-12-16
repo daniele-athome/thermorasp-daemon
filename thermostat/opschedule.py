@@ -181,12 +181,12 @@ class OperatingSchedule(object):
             if any(message.topic.startswith(self.sensors[sensor_id].topic)
                    for sensor_id in self.behavior_def['sensors']):
                 # noinspection PyAsyncCall
-                asyncio.ensure_future(behavior.sensor_data(message.topic, json.loads(message.data))) \
+                asyncio.ensure_future(behavior.sensor_data(message.topic, json.loads(message.data.decode()))) \
                        .add_done_callback(self._future_result)
             elif any(message.topic.startswith(self.devices[device_id].topic)
                      for device_id in self.behavior_def['devices']):
                 # noinspection PyAsyncCall
-                asyncio.ensure_future(behavior.device_state(message.topic, json.loads(message.data))) \
+                asyncio.ensure_future(behavior.device_state(message.topic, json.loads(message.data.decode()))) \
                        .add_done_callback(self._future_result)
 
     def _future_result(self, task: asyncio.Future):

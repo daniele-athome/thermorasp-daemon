@@ -116,5 +116,5 @@ class OperatingScheduleTest(BaseTest, unittest.TestCase):
         # behavior should have sent control command
         message = yield from client.deliver_message()
         self.assertEqual(message.topic, schedule.devices['home_boiler'].topic + '/control')
-        payload = json.loads(message.data)
+        payload = json.loads(message.data.decode())
         self.assertEqual(payload['enabled'], enabled)
