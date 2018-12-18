@@ -212,7 +212,7 @@ class OperatingSchedule(object):
         candidate = None
         for bev in self.schedule['behaviors']:
             if bev['start_time'] <= offset < bev['end_time'] and \
-                    (candidate is None or candidate['order'] <= bev['order']):
+                    (candidate is None or bev['order'] <= candidate['order']):
                 candidate = bev
         return candidate
 
