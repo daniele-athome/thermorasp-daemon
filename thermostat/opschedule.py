@@ -150,6 +150,9 @@ class OperatingSchedule(object):
 
             try:
                 await self.behavior.shutdown()
+                if self.behavior_def['order'] == 0:
+                    logger.info("Volatile behavior expired")
+                    raise SelfDestructError()
             except SelfDestructError:
                 logger.debug("Behavior self-destructed during shutdown")
                 self.delete_behavior(self.behavior_def)
