@@ -22,8 +22,11 @@ args = parser.parse_args()
 
 app.config.from_pyfile(args.config)
 
-if args.debug:
-    CORS(app, automatic_options=True)
+try:
+    if args.debug:
+        CORS(app, automatic_options=True)
+except ImportError:
+    print("Debug enabled but sanic_cors not available")
 
 app.broker_url = 'mqtt://' + app.config['BROKER_HOST'] + ':' + str(app.config['BROKER_PORT']) + '/'
 app.default_sensors_validity = app.config['SENSORS_VALIDITY']
