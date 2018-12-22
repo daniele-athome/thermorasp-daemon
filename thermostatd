@@ -9,8 +9,6 @@ import uvloop
 from signal import signal, SIGINT, SIGTERM
 from argparse import ArgumentParser
 
-from sanic_cors import CORS
-
 from thermostat import app, database, eventlog
 
 parser = ArgumentParser(__doc__)
@@ -24,6 +22,7 @@ app.config.from_pyfile(args.config)
 
 try:
     if args.debug:
+        from sanic_cors import CORS
         CORS(app, automatic_options=True)
 except ImportError:
     print("Debug enabled but sanic_cors not available")
