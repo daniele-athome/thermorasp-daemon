@@ -105,11 +105,11 @@ class Backend(object):
             if self.schedule:
                 await self.schedule.timer()
 
-    async def update_operating_schedule(self, behaviors):
+    async def update_operating_schedule(self, schedule):
         """Updates the current operating schedule instance with new behaviors. Used for temporary alterations."""
         with await self.schedule_lock:
             if self.schedule:
-                if await self.schedule.update(behaviors):
+                if await self.schedule.update(schedule):
                     await self.timer.trigger()
 
     async def update_operating_behavior(self, behavior_id, config):

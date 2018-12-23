@@ -21,8 +21,8 @@ def serialize_schedule_behavior(b: Behavior):
         'id': b.id,
         'name': b.behavior_name,
         'order': b.behavior_order,
-        'start': b.start_time,
-        'end': b.end_time,
+        'start_time': b.start_time,
+        'end_time': b.end_time,
         'config': json_loads(b.config),
         'sensors': [s.sensor_id for s in b.sensors],
         'devices': [d.device_id for d in b.devices],
@@ -96,7 +96,7 @@ async def update_active(request: Request):
 
     data = request.json
     if 'behaviors' in data:
-        await app.backend.update_operating_schedule(data['behaviors'])
+        await app.backend.update_operating_schedule(data)
 
     return no_content()
 
@@ -164,8 +164,8 @@ async def create(request: Request):
                 beh = Behavior()
                 beh.behavior_name = data_behavior['name']
                 beh.behavior_order = data_behavior['order']
-                beh.start_time = data_behavior['start']
-                beh.end_time = data_behavior['end']
+                beh.start_time = data_behavior['start_time']
+                beh.end_time = data_behavior['end_time']
                 beh.config = json_dumps(data_behavior['config'])
                 if 'sensors' in data_behavior:
                     beh.sensors = data_behavior['sensors']
@@ -193,7 +193,7 @@ async def create(request: Request):
 async def delete(request: Request, schedule_id: int):
     """Deletes a schedule."""
 
-    if app.backend.schedule and app.backend.schedule.id == schedule_id:
+    if app.backend.schedule and app.backend.schedule.schedule['id'] == schedule_id:
         # deactivate if active
         await app.backend.set_operating_schedule(None)
 
@@ -215,7 +215,7 @@ async def update(request: Request, schedule_id: int):
     with scoped_session(app.database) as session:
         try:
             sched = session.query(Schedule).filter(Schedule.id == schedule_id).one()
-            if app.backend.schedule and app.backend.schedule.id == schedule_id:
+            if app.backend.schedule and app.backend.schedule.schedule['id'] == schedule_id:
                 new_enabled = sched.enabled
 
             if 'name' in data:
@@ -236,8 +236,8 @@ async def update(request: Request, schedule_id: int):
                     beh = Behavior()
                     beh.behavior_name = data_behavior['name']
                     beh.behavior_order = data_behavior['order']
-                    beh.start_time = data_behavior['start']
-                    beh.end_time = data_behavior['end']
+                    beh.start_time = data_behavior['start_time']
+                    beh.end_time = data_behavior['end_time']
                     beh.config = json_dumps(data_behavior['config'])
                     sched.behaviors.append(beh)
             session.add(sched)
@@ -252,7 +252,7 @@ async def update(request: Request, schedule_id: int):
     # enable immediately if requested
     if new_enabled:
         await app.backend.set_operating_schedule(schedule_id)
-    elif app.backend.pipeline and app.backend.schedule.id == schedule_id:
+    elif app.backend.pipeline and app.backend.schedule.schedule['id'] == schedule_id:
         await app.backend.set_operating_schedule(None)
 
     return no_content()

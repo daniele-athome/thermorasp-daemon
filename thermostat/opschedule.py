@@ -44,18 +44,20 @@ class OperatingSchedule(object):
             await self.stop_behavior()
         await self.broker.disconnect()
 
-    async def update(self, behaviors):
+    async def update(self, schedule):
         """Return true if something has changed in a currently running behavior."""
         if self.behavior:
             await self.stop_behavior()
 
         # assign indexes to behaviors
         index = 0
-        for bev in behaviors:
+        for bev in schedule['behaviors']:
             index += 1
             bev['id'] = index
 
-        self.schedule['behaviors'] = behaviors
+        self.schedule['name'] = schedule['name']
+        self.schedule['description'] = schedule['description']
+        self.schedule['behaviors'] = schedule['behaviors']
         return True
 
     async def update_behavior(self, behavior_id: int, config: dict):
