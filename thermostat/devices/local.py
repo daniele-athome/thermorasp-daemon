@@ -8,6 +8,7 @@ try:
 except ImportError:
     from fake_rpi.RPi import GPIO as GPIO
 
+from sanic.log import logger
 
 from . import BaseDeviceHandler
 from .. import app
@@ -46,9 +47,11 @@ class GPIOSwitchDeviceHandler(BaseDeviceHandler):
         self.enabled = enabled
 
     def startup(self):
+        BaseDeviceHandler.startup(self)
         self.set_switch(False)
 
     def shutdown(self):
+        BaseDeviceHandler.shutdown(self)
         self.set_switch(False)
 
     async def control(self, data):
@@ -70,6 +73,7 @@ class GPIO2SwitchDeviceHandler(GPIOSwitchDeviceHandler):
         self.set_switch(False)
 
     def set_switch(self, enabled):
+        logger.info("Setting device {} to state: {}".format(self.get_name(), enabled))
         GPIO.setmode(GPIO.BCM)
         if enabled:
             GPIO.setup(self.pin, GPIO.OUT)
