@@ -73,6 +73,10 @@ class GPIOW1SensorHandler(BaseSensorHandler):
             self.interval = int(params['interval'][0])
         else:
             self.interval = self.DEFAULT_INTERVAL
+        if params and 'address' in params:
+            self.sensor_address = params['address'][0]
+        else:
+            self.sensor_address = None
 
     def startup(self):
         BaseSensorHandler.startup(self)
@@ -97,7 +101,7 @@ class GPIOW1SensorHandler(BaseSensorHandler):
             # random temperature :D
             temp = randint(-10, 40)
         else:
-            sensor = W1ThermSensor(sensor_id=self.address)
+            sensor = W1ThermSensor(sensor_id=self.sensor_address)
             temp = sensor.get_temperature(unit=W1ThermSensor.DEGREES_C)
 
         # round it up to the nearest half since it's all we are interested in
