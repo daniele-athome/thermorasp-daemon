@@ -26,8 +26,7 @@ def serialize_sensor(sensor):
         'type': sensor.type,
         'protocol': sensor.protocol,
         'address': sensor.address,
-        'topic': sensor.topic,
-        'validity': sensor.validity,
+        'topic': sensor.topic
     }
 
 
