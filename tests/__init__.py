@@ -55,7 +55,6 @@ class BaseTest(object):
 
         app.broker_url = 'mqtt://127.0.0.1:9883/'
         app.eventlog = DummyEventLogger()
-        app.default_sensors_validity = 300
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 

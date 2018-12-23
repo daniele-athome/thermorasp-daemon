@@ -6,9 +6,6 @@ SENSORS_INTERVAL=60
 # Backend loop interval in seconds.
 BACKEND_INTERVAL=30
 
-# Sensors reading validity in seconds.
-SENSORS_VALIDITY=600
-
 # Database URL
 DATABASE_URL="sqlite:////var/lib/thermostat/thermostat.db"
 

@@ -7,7 +7,7 @@ import importlib
 import pkgutil
 import hbmqtt.client as mqtt_client
 
-from .. import app, util
+from .. import util
 
 
 class SelfDestructError(Exception):
@@ -65,8 +65,8 @@ class BaseBehavior(object):
     def last_reading_avg(self, unit):
         if self.last_sensor_data:
             values = [data['value'] for data in self.last_sensor_data.values()
-                      if data['unit'] == unit and not util.is_past_then(data['timestamp'],
-                                                                        app.default_sensors_validity)]
+                      if data['unit'] == unit and ('validity' not in data or not util.is_past_then(data['timestamp'],
+                                                                                                   data['validity']))]
             if values:
                 return statistics.mean(values)
         else:

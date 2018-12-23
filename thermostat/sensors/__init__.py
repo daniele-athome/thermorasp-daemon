@@ -14,9 +14,6 @@ from .. import app
 class BaseSensorHandler(object):
     """Base interface for sensor handlers."""
 
-    # subclasses should override DEFAULT_VALIDITY with a proper value in seconds, or -1 for always valid
-    DEFAULT_VALIDITY = -1
-
     def __init__(self, sensor_id: str, address: str, sensor_type: str):
         self.id = sensor_id
         self.address = address
@@ -25,7 +22,6 @@ class BaseSensorHandler(object):
         self.is_running = False
         self.timer = None
         self.topic = app.new_topic('sensor/' + sensor_id)
-        self.validity = self.DEFAULT_VALIDITY
 
     async def _connect(self):
         await self.broker.connect(app.broker_url)
