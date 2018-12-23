@@ -12,7 +12,7 @@ from sanic.response import json
 from . import no_content
 from .. import app, errors
 from ..database import scoped_session
-from ..models import Schedule, Behavior
+from ..models import Schedule, Behavior, BehaviorSensor, BehaviorDevice
 
 
 # noinspection PyTypeChecker
@@ -168,9 +168,17 @@ async def create(request: Request):
                 beh.end_time = data_behavior['end_time']
                 beh.config = json_dumps(data_behavior['config'])
                 if 'sensors' in data_behavior:
-                    beh.sensors = data_behavior['sensors']
+                    beh.sensors = []
+                    for sensor in data_behavior['sensors']:
+                        sen = BehaviorSensor()
+                        sen.sensor_id = sensor
+                        beh.sensors.append(sen)
                 if 'devices' in data_behavior:
-                    beh.devices = data_behavior['devices']
+                    beh.devices = []
+                    for device in data_behavior['devices']:
+                        dev = BehaviorDevice()
+                        dev.device_id = device
+                        beh.devices.append(dev)
                 sched.behaviors.append(beh)
         session.add(sched)
         session.flush()
@@ -229,7 +237,10 @@ async def update(request: Request, schedule_id: int):
 
             if 'behaviors' in data:
                 # delete all behaviors first
-                session.query(Behavior).filter(Behavior.schedule_id == schedule_id).delete()
+                for behavior in session.query(Behavior).filter(Behavior.schedule_id == schedule_id).all():
+                    session.query(BehaviorSensor).filter(BehaviorSensor.behavior_id == behavior.id).delete()
+                    session.query(BehaviorDevice).filter(BehaviorDevice.behavior_id == behavior.id).delete()
+                    session.delete(behavior)
 
                 sched.behaviors = []
                 for data_behavior in data['behaviors']:
@@ -240,6 +251,19 @@ async def update(request: Request, schedule_id: int):
                     beh.end_time = data_behavior['end_time']
                     beh.config = json_dumps(data_behavior['config'])
                     sched.behaviors.append(beh)
+                    if 'sensors' in data_behavior:
+                        beh.sensors = []
+                        for sensor in data_behavior['sensors']:
+                            sen = BehaviorSensor()
+                            sen.sensor_id = sensor
+                            beh.sensors.append(sen)
+                    if 'devices' in data_behavior:
+                        beh.devices = []
+                        for device in data_behavior['devices']:
+                            dev = BehaviorDevice()
+                            dev.device_id = device
+                            beh.devices.append(dev)
+
             session.add(sched)
 
             if new_enabled:
