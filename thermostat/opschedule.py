@@ -109,6 +109,7 @@ class OperatingSchedule(object):
                 await self.start_behavior(behavior_def)
             else:
                 logger.debug("No behavior found!")
+                await self.total_shutdown()
         else:
             # behavior already running, wake it up
             logger.debug("Pinging behavior")
@@ -202,6 +203,13 @@ class OperatingSchedule(object):
             task.exception()
             asyncio.ensure_future(self.stop_behavior()) \
                 .add_done_callback(functools.partial(self._delete_behavior, behavior_def=self.behavior_def))
+
+    async def total_shutdown(self):
+        for device in self.devices.values():
+            await self.control_device(device.topic, {'enabled': False})
+
+    async def control_device(self, topic, data):
+        await self.broker.publish(topic + '/control', json.dumps(data).encode(), retain=False)
 
     def get_sensor_topics(self, behavior_def=None):
         if behavior_def is None:
