@@ -51,14 +51,14 @@ class SensorManager(object):
         with scoped_session(self.database) as session:
             stmt = Sensor.__table__.select()
             for d in session.execute(stmt):
-                self._register(d['id'], d['protocol'], d['address'], d['sensor_type'])
+                self._register(d['id'], d['protocol'], d['address'], d['sensor_type'], d['icon'])
 
-    def _register(self, sensor_id, protocol, address, sensor_type):
+    def _register(self, sensor_id, protocol, address, sensor_type, icon):
         """Creates a new sensor and stores the instance in the internal collection."""
         if sensor_id in self.sensors:
             self._unregister(sensor_id)
 
-        sensor_instance = get_sensor_handler(sensor_id, protocol, address, sensor_type)
+        sensor_instance = get_sensor_handler(sensor_id, protocol, address, sensor_type, icon)
         self.sensors[sensor_id] = sensor_instance
         if self.connected:
             self.sensors_subs[sensor_id] = asyncio.ensure_future(self._subscribe_and_startup_sensor(sensor_instance))
@@ -119,16 +119,17 @@ class SensorManager(object):
             reading.value = value
             session.add(reading)
 
-    def register(self, sensor_id, protocol, address, sensor_type):
+    def register(self, sensor_id, protocol, address, sensor_type, icon):
         with scoped_session(self.database) as session:
             sensor = Sensor()
             sensor.id = sensor_id
             sensor.protocol = protocol
             sensor.address = address
             sensor.sensor_type = sensor_type
+            sensor.icon = icon
             sensor = session.merge(sensor)
             # will also unregister old device if any
-            self._register(sensor.id, sensor.protocol, sensor.address, sensor.sensor_type)
+            self._register(sensor.id, sensor.protocol, sensor.address, sensor.sensor_type, sensor.icon)
 
     def unregister(self, sensor_id):
         try:

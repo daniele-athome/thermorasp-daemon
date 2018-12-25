@@ -26,7 +26,8 @@ def serialize_sensor(sensor):
         'type': sensor.type,
         'protocol': sensor.protocol,
         'address': sensor.address,
-        'topic': sensor.topic
+        'icon': sensor.icon,
+        'topic': sensor.topic,
     }
 
 
@@ -63,7 +64,7 @@ async def register(request: Request):
     """
 
     in_data = request.json
-    app.backend.sensors.register(in_data['id'], in_data['protocol'], in_data['address'], in_data['type'])
+    app.backend.sensors.register(in_data['id'], in_data['protocol'], in_data['address'], in_data['type'], in_data['icon'])
     return json({'id': in_data['id']}, 201)
 
 

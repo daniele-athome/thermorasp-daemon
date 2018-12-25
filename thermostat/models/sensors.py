@@ -34,6 +34,7 @@ class Sensor(Base):
     # Sensor attributes
     sensor_type = Column(String(20))
     data_mode = Column(Integer(), default=DATA_MODE_ACTIVE)  # deprecated?
+    icon = Column(String(50), nullable=True)
 
     # Sensor status
     status = Column(Integer(), default=STATUS_UNKNOWN)

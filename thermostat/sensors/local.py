@@ -29,8 +29,8 @@ class RandomSensorHandler(BaseSensorHandler):
     protocol = 'RND'
     DEFAULT_INTERVAL = 60
 
-    def __init__(self, sensor_id: str, address: str, sensor_type: str):
-        BaseSensorHandler.__init__(self, sensor_id, address, sensor_type)
+    def __init__(self, sensor_id: str, address: str, sensor_type: str, icon: str):
+        BaseSensorHandler.__init__(self, sensor_id, address, sensor_type, icon)
         params = urllib_parse.parse_qs(address)
         self.last_temperature = None
         if params and 'interval' in params:
@@ -65,8 +65,8 @@ class GPIOW1SensorHandler(BaseSensorHandler):
     protocol = 'GPIOW1'
     DEFAULT_INTERVAL = 60
 
-    def __init__(self, sensor_id: str, address: str, sensor_type: str):
-        BaseSensorHandler.__init__(self, sensor_id, address, sensor_type)
+    def __init__(self, sensor_id: str, address: str, sensor_type: str, icon: str):
+        BaseSensorHandler.__init__(self, sensor_id, address, sensor_type, icon)
         params = urllib_parse.parse_qs(address)
         self.last_temperature = None
         if params and 'interval' in params:
