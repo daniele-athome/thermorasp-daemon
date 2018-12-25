@@ -9,6 +9,7 @@ import json
 import hbmqtt.client as mqtt_client
 
 from sanic.log import logger
+from sqlalchemy.orm.exc import NoResultFound
 
 from .database import scoped_session
 from . import app, sensorman, deviceman, opschedule
@@ -171,14 +172,18 @@ class Backend(object):
             'id': -1,
             'name': 'Temporary schedule',
             'description': 'Temporary schedule',
-            'behaviors': [behavior_def]
+            'behaviors': [behavior_def],
+            'enabled': True
         }
 
     def get_schedule(self, schedule_id):
         with scoped_session(self.app.database) as session:
-            return self._schedule_model(session.query(Schedule)
-                                        .filter(Schedule.id == schedule_id)
-                                        .one())
+            try:
+                return self._schedule_model(session.query(Schedule)
+                                            .filter(Schedule.id == schedule_id)
+                                            .one())
+            except NoResultFound:
+                return None
 
     @staticmethod
     def _schedule_model(s: Schedule):
