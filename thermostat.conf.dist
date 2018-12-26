@@ -12,7 +12,7 @@ DATABASE_URL="sqlite:////var/lib/thermostat/thermostat.db"
 # Broker configuration
 BROKER_HOST="localhost"
 BROKER_PORT=1883
-BROKER_TOPIC="home-assistant"
+BROKER_TOPIC="homeassistant"
 
 DEVICE_ID="thermorasp"
 DEVICE_NAME="Thermorasp"
