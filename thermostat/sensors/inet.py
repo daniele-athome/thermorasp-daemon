@@ -62,6 +62,7 @@ class HTTPSensorHandler(BaseSensorHandler):
 
 
 class OpenWeatherMapSensorHandler(HTTPSensorHandler):
+    """OpenWeatherMap HTTP sensor handler. Use your own API key."""
 
     protocol = 'HTTP-OWM'
     DEFAULT_INTERVAL = 1800

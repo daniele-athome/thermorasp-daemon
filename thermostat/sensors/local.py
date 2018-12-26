@@ -23,6 +23,15 @@ from w1thermsensor import W1ThermSensor
 from . import BaseSensorHandler
 
 
+class MQTTLocalSensorHandler(BaseSensorHandler):
+    """A placeholder sensor handler for data received through the local MQTT broker."""
+
+    protocol = 'MQTT-LOCAL'
+
+    def __init__(self, sensor_id: str, address: str, sensor_type: str, icon: str):
+        BaseSensorHandler.__init__(self, sensor_id, address, sensor_type, icon)
+
+
 class RandomSensorHandler(BaseSensorHandler):
     """A sensor handler that returns random values for various sensor types."""
 
@@ -111,4 +120,5 @@ class GPIOW1SensorHandler(BaseSensorHandler):
 schemes = {
     GPIOW1SensorHandler.protocol: GPIOW1SensorHandler,
     RandomSensorHandler.protocol: RandomSensorHandler,
+    MQTTLocalSensorHandler.protocol: MQTTLocalSensorHandler,
 }
