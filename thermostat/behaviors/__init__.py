@@ -72,6 +72,12 @@ class BaseBehavior(object):
         else:
             return None
 
+    def find_device_topic(self, topic: str):
+        return next((device for device in self.devices if topic.startswith(device)), None)
+
+    def find_sensor_topic(self, topic: str):
+        return next((sensor for sensor in self.sensors if topic.startswith(sensor)), None)
+
 
 def get_behaviors():
     """Return a list of all behavior IDs (i.e. name of classes extending BaseBehavior)."""

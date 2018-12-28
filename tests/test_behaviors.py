@@ -16,10 +16,10 @@ from . import BaseTest
 class TargetTemperatureBehaviorTest(BaseTest, unittest.TestCase):
 
     sensors = [
-        'home-assistant/thermorasp/sensor/temp_core'
+        'homeassistant/thermorasp/sensor/temp_core'
     ]
     devices = [
-        'home-assistant/thermorasp/device/home_boiler'
+        'homeassistant/thermorasp/device/home_boiler'
     ]
 
     def testHeating(self):
@@ -36,11 +36,38 @@ class TargetTemperatureBehaviorTest(BaseTest, unittest.TestCase):
                 yield from behavior.startup({'target_temperature': 25, 'mode': 'heating'})
 
                 yield from self._testTargetTemperature(behavior, client, 20, True)
-                yield from self._testTargetTemperature(behavior, client, 10, True)
+                yield from self._testTargetTemperature(behavior, client, 10, None)
                 yield from self._testTargetTemperature(behavior, client, 30, False)
                 yield from self._testTargetTemperature(behavior, client, 18, True)
                 yield from self._testTargetTemperature(behavior, client, 25.5, False)
-                yield from self._testTargetTemperature(behavior, client, 25, False)
+                yield from self._testTargetTemperature(behavior, client, 25, None)
+                # test continuous increment
+                yield from self._testTargetTemperature(behavior, client, 24, True)
+                yield from self._testTargetTemperature(behavior, client, 24.5, None)
+                yield from self._testTargetTemperature(behavior, client, 25, None)
+                yield from self._testTargetTemperature(behavior, client, 25.5, False)
+                yield from self._testTargetTemperature(behavior, client, 25, None)
+                yield from self._testTargetTemperature(behavior, client, 24, True)
+                yield from self._testTargetTemperature(behavior, client, 24, None)
+                yield from self._testTargetTemperature(behavior, client, 24.5, None)
+                yield from self._testTargetTemperature(behavior, client, 25, None)
+                yield from self._testTargetTemperature(behavior, client, 25.5, False)
+                yield from self._testTargetTemperature(behavior, client, 25, None)
+                yield from self._testTargetTemperature(behavior, client, 24, True)
+
+                yield from behavior.update({'target_temperature': 24, 'mode': 'heating'})
+                yield from self._testTargetTemperature(behavior, client, 24, None)
+                yield from self._testTargetTemperature(behavior, client, 24.5, False)
+                yield from self._testTargetTemperature(behavior, client, 24, None)
+                yield from self._testTargetTemperature(behavior, client, 23.5, True)
+
+                yield from behavior.update({'target_temperature': 23, 'mode': 'heating'})
+                yield from self._testTargetTemperature(behavior, client, 23, None)
+                yield from self._testTargetTemperature(behavior, client, 23.5, False)
+                yield from self._testTargetTemperature(behavior, client, 24, None)
+                yield from self._testTargetTemperature(behavior, client, 23.5, None)
+                yield from self._testTargetTemperature(behavior, client, 23, None)
+                yield from self._testTargetTemperature(behavior, client, 22.5, True)
 
                 yield from client.disconnect()
                 yield from broker.shutdown()
@@ -70,7 +97,7 @@ class TargetTemperatureBehaviorTest(BaseTest, unittest.TestCase):
                 yield from self._testTargetTemperature(behavior, client, 30, True)
                 yield from self._testTargetTemperature(behavior, client, 18, False)
                 yield from self._testTargetTemperature(behavior, client, 25.5, True)
-                yield from self._testTargetTemperature(behavior, client, 25, True)
+                yield from self._testTargetTemperature(behavior, client, 25, None)
 
                 yield from behavior.shutdown()
 
@@ -107,7 +134,14 @@ class TargetTemperatureBehaviorTest(BaseTest, unittest.TestCase):
             self.fail('No sensor or device data received.')
 
         # behavior should have sent control command
-        message = yield from client.deliver_message()
-        self.assertEqual(message.topic, self.devices[0] + '/control')
-        payload = json.loads(message.data.decode())
-        self.assertEqual(payload['enabled'], enabled)
+        try:
+            message = yield from client.deliver_message(1)
+            self.assertEqual(message.topic, self.devices[0] + '/control')
+            payload = json.loads(message.data.decode())
+            self.assertEqual(payload['enabled'], enabled)
+
+            # send the control command to the behavior to simulate device state change
+            yield from behavior.device_state(self.devices[0] + '/state', payload)
+        except asyncio.TimeoutError as e:
+            if enabled is not None:
+                raise e

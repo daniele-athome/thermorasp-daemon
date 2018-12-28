@@ -39,8 +39,8 @@ class OperatingScheduleTest(BaseTest, unittest.TestCase):
             try:
                 broker = yield from self.startBroker()
 
-                sensors = DummyManager({'temp_core': DummyItem('home-assistant/thermorasp/sensor/temp_core')})
-                devices = DummyManager({'home_boiler': DummyItem('home-assistant/thermorasp/device/home_boiler')})
+                sensors = DummyManager({'temp_core': DummyItem('homeassistant/thermorasp/sensor/temp_core')})
+                devices = DummyManager({'home_boiler': DummyItem('homeassistant/thermorasp/device/home_boiler')})
                 schedule = OperatingSchedule(sensors, devices, {
                     'id': 1,
                     'behaviors': [

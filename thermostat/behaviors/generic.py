@@ -17,6 +17,7 @@ class TargetTemperatureBehavior(BaseBehavior):
         BaseBehavior.__init__(self, behavior_id, name, sensors, devices, broker)
         self.cooling = None
         self.target_temperature = None
+        self.current_state = {}
 
     def _init(self, config):
         self.cooling = 'mode' in config and config['mode'] == 'cooling'
@@ -62,6 +63,9 @@ class TargetTemperatureBehavior(BaseBehavior):
     async def device_state(self, topic: str, data: dict):
         await BaseBehavior.device_state(self, topic, data)
         logger.debug("TARGET got device state from {}: {}".format(topic, data))
+        device = self.find_device_topic(topic)
+        if device and topic[len(device):] == '/state':
+            self.current_state[self.find_device_topic(topic)] = data
 
     async def _logic(self):
         avg_temp = self.last_reading_avg('celsius')
@@ -74,12 +78,18 @@ class TargetTemperatureBehavior(BaseBehavior):
 
         last_reading = round(avg_temp, 1)
         target_temperature = round(self.target_temperature, 1)
-        if self.cooling:
-            enabled = last_reading > target_temperature
-        else:
-            enabled = last_reading < target_temperature
-        app.eventlog.event(eventlog.LEVEL_INFO, self.name, 'behavior:action',
-                           'last reading: {}, target: {}, enabled: {}'
-                           .format(last_reading, target_temperature, enabled))
         for device in self.devices:
-            await self.control_device(device, {'enabled': enabled})
+            if self.cooling:
+                enabled = last_reading > target_temperature
+            else:
+                if device in self.current_state and self.current_state[device]['enabled']:
+                    offset = 0.5
+                else:
+                    offset = 0
+                enabled = last_reading < (target_temperature + offset)
+
+            if device not in self.current_state or self.current_state[device]['enabled'] != enabled:
+                app.eventlog.event(eventlog.LEVEL_INFO, self.name, 'behavior:action',
+                                   'last reading: {}, target: {}, enabled: {}'
+                                   .format(last_reading, target_temperature, enabled))
+                await self.control_device(device, {'enabled': enabled})

@@ -35,7 +35,7 @@ class DummyEventLogger(object):
         pass
 
     def event(self, level: str, source: str, name: str, description: str = None):
-        print("EVENT: {}/{}: {} - {}".format(level, source, name, description))
+        print(">>>> EVENT: {}/{}: {} - {}".format(level, source, name, description))
 
     def event_exc(self, level: str, source: str, name: str):
         import traceback
