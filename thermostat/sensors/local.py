@@ -42,11 +42,14 @@ class MQTTRemoteSensorHandler(BaseSensorHandler):
 
     async def message(self, data):
         # publish to the right topic
-        await self.publish({
+        reading = {
             'value': data['value'],
             'unit': data['unit'],
             'timestamp': datetime.datetime.now().isoformat(),
-        }, '/' + data['type'], retain=True)
+        }
+        if 'validity' in data:
+            reading['validity'] = data['validity']
+        await self.publish(reading, '/' + data['type'], retain=True)
 
 
 class RandomSensorHandler(BaseSensorHandler):
