@@ -33,7 +33,7 @@ class BaseSensorHandler(object):
         while self.is_running:
             message = await self.broker.deliver_message()
             logger.debug(self.id + " SENSOR topic={}, payload={}".format(message.topic, message.data))
-            await self.message(message.data.decode())
+            await self.message(json.loads(message.data.decode()))
 
     async def _disconnect(self):
         await self.broker.disconnect()
@@ -71,7 +71,7 @@ class BaseSensorHandler(object):
         pass
 
     # TODO since we subscribed to topic "control", "message" might be confusing
-    async def message(self, payload):
+    async def message(self, data):
         pass
 
     def get_name(self):

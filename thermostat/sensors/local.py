@@ -32,6 +32,23 @@ class MQTTLocalSensorHandler(BaseSensorHandler):
         BaseSensorHandler.__init__(self, sensor_id, address, sensor_type, icon)
 
 
+class MQTTRemoteSensorHandler(BaseSensorHandler):
+    """A sensor handler for data received through the local MQTT broker, but through the control topic."""
+
+    protocol = 'MQTT-REMOTE'
+
+    def __init__(self, sensor_id: str, address: str, sensor_type: str, icon: str):
+        BaseSensorHandler.__init__(self, sensor_id, address, sensor_type, icon)
+
+    async def message(self, data):
+        # publish to the right topic
+        await self.publish({
+            'value': data['value'],
+            'unit': data['unit'],
+            'timestamp': datetime.datetime.now().isoformat(),
+        }, '/' + data['type'], retain=True)
+
+
 class RandomSensorHandler(BaseSensorHandler):
     """A sensor handler that returns random values for various sensor types."""
 
@@ -121,4 +138,5 @@ schemes = {
     GPIOW1SensorHandler.protocol: GPIOW1SensorHandler,
     RandomSensorHandler.protocol: RandomSensorHandler,
     MQTTLocalSensorHandler.protocol: MQTTLocalSensorHandler,
+    MQTTRemoteSensorHandler.protocol: MQTTRemoteSensorHandler,
 }
