@@ -49,7 +49,8 @@ class BaseBehavior(object):
 
     async def sensor_data(self, topic: str, data: dict):
         """Called when a sensor has new data."""
-        self.last_sensor_data[topic] = data
+        if not topic.endswith('/control'):
+            self.last_sensor_data[topic] = data
 
     async def device_state(self, device_topic: str, data: dict):
         """Called when a device changes its state."""
