@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """General purpose behaviors."""
 
+import math
 import hbmqtt.client as mqtt_client
 
 from sanic.log import logger
@@ -76,8 +77,8 @@ class TargetTemperatureBehavior(BaseBehavior):
 
         logger.debug("TARGET average temperature: {}".format(avg_temp))
 
-        last_reading = round(avg_temp, 1)
-        target_temperature = round(self.target_temperature, 1)
+        last_reading = math.floor(avg_temp * 2) / 2
+        target_temperature = self.target_temperature
         for device in self.devices:
             if self.cooling:
                 enabled = last_reading > target_temperature
