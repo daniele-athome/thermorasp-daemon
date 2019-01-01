@@ -83,10 +83,12 @@ class TargetTemperatureBehavior(BaseBehavior):
             if self.cooling:
                 enabled = last_reading > target_temperature
             else:
-                if device in self.current_state and self.current_state[device]['enabled']:
-                    offset = 0.5
-                else:
-                    offset = 0
+                offset = 0
+                if device in self.current_state:
+                    if self.current_state[device]['enabled']:
+                        offset = 0.5
+                    else:
+                        offset = -0.5
                 enabled = last_reading < (target_temperature + offset)
 
             if device not in self.current_state or self.current_state[device]['enabled'] != enabled:
