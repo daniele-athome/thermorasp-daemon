@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 """Sensors API."""
 
+import datetime
+
 from sanic.request import Request
 from sanic.response import json
 
 from .. import app, errors
+from ..database import scoped_session
+from ..models.sensors import Reading
 
 
 SENSOR_STATUS_MAP = (
@@ -38,6 +42,16 @@ def serialize_sensor_reading(sensor_id, mreading):
         'timestamp': mreading['timestamp'].isoformat(),
         'unit': mreading['unit'],
         'value': mreading['value'],
+    }
+
+
+def serialize_sensor_reading_db(mreading: Reading):
+    return {
+        'sensor_id': mreading.sensor_id,
+        'type': mreading.sensor_type,
+        'timestamp': mreading.timestamp.isoformat(),
+        'unit': mreading.unit,
+        'value': float(mreading.value),
     }
 
 
@@ -105,3 +119,27 @@ async def reading(request: Request, sensor_id: str):
         return json(serialize_sensor_reading(sensor_id, r))
     else:
         return json({})
+
+
+@app.get('/sensors/readings')
+async def reading_list(request: Request):
+    """Reads sensor readings from the database."""
+
+    if 'sensor_type' in request.args:
+        sensor_type = request.args['sensor_type'][0]
+    else:
+        sensor_type = None
+
+    date_from = datetime.datetime.strptime(request.args['from'][0], '%Y-%m-%dT%H:%M:%S')
+    date_to = datetime.datetime.strptime(request.args['to'][0], '%Y-%m-%dT%H:%M:%S')
+
+    with scoped_session(app.database) as session:
+        query = session.query(Reading)
+        if sensor_type:
+            query = query.filter(Reading.sensor_type == sensor_type)
+
+        readings = query.filter(Reading.timestamp.between(date_from, date_to)) \
+                        .order_by(Reading.timestamp) \
+                        .all()
+
+        return json([serialize_sensor_reading_db(r) for r in readings])
