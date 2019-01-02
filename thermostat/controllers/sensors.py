@@ -18,11 +18,6 @@ SENSOR_STATUS_MAP = (
     'inactive',
 )
 
-SENSOR_DATA_MODE_MAP = (
-    'active',
-    'passive',
-)
-
 
 def serialize_sensor(sensor):
     return {

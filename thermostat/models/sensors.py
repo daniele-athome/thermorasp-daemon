@@ -12,12 +12,6 @@ from . import Base
 class Sensor(Base):
     __tablename__ = 'sensors'
 
-    # Sensor data mode
-    # Active: sensor sends to server
-    DATA_MODE_ACTIVE = 0
-    # Passive: server polls the sensor
-    DATA_MODE_PASSIVE = 1
-
     # Sensor status
     STATUS_UNKNOWN = 0
     STATUS_REGISTERED = 1
@@ -33,7 +27,6 @@ class Sensor(Base):
 
     # Sensor attributes
     sensor_type = Column(String(20))
-    data_mode = Column(Integer(), default=DATA_MODE_ACTIVE)  # deprecated?
     icon = Column(String(50), nullable=True)
 
     # Sensor status

@@ -153,11 +153,6 @@ class Backend(object):
             await self.schedule.shutdown()
             self.schedule = None
 
-    def get_passive_sensors(self):
-        with scoped_session(self.app.database) as session:
-            stmt = Sensor.__table__.select().where(Sensor.data_mode == Sensor.DATA_MODE_PASSIVE)
-            return [dict(s) for s in session.execute(stmt)]
-
     def get_enabled_schedules(self):
         with scoped_session(self.app.database) as session:
             return [self._schedule_model(s) for s in session.query(Schedule)
