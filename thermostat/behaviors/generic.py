@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """General purpose behaviors."""
 
-import math
 import hbmqtt.client as mqtt_client
 
 from sanic.log import logger
@@ -59,7 +58,16 @@ class TargetTemperatureBehavior(BaseBehavior):
         await BaseBehavior.sensor_data(self, topic, data)
         logger.debug("TARGET got sensor data from {}: {}".format(topic, data))
         logger.debug("TARGET devices: {}".format(self.devices))
-        await self._logic()
+        if self.device_state_received():
+            await self._logic()
+        else:
+            logger.debug("TARGET device state not received yet")
+
+    def device_state_received(self):
+        for device in self.devices:
+            if device not in self.current_state:
+                return False
+        return True
 
     async def device_state(self, topic: str, data: dict):
         await BaseBehavior.device_state(self, topic, data)
@@ -67,6 +75,8 @@ class TargetTemperatureBehavior(BaseBehavior):
         device = self.find_device_topic(topic)
         if device and topic[len(device):] == '/state':
             self.current_state[self.find_device_topic(topic)] = data
+            if self.device_state_received():
+                await self._logic()
 
     async def _logic(self):
         avg_temp = self.last_reading_avg('celsius')
@@ -77,19 +87,18 @@ class TargetTemperatureBehavior(BaseBehavior):
 
         logger.debug("TARGET average temperature: {}".format(avg_temp))
 
-        last_reading = math.floor(avg_temp * 2) / 2
+        last_reading = round(avg_temp * 2) / 2
         target_temperature = self.target_temperature
         for device in self.devices:
             if self.cooling:
                 enabled = last_reading > target_temperature
             else:
+                logger.debug("TARGET current device state: {}".format(self.current_state))
                 offset = 0
-                if device in self.current_state:
-                    if self.current_state[device]['enabled']:
-                        offset = 0.5
-                    else:
-                        offset = -0.5
+                if device in self.current_state and self.current_state[device]['enabled']:
+                    offset = 0.5
                 enabled = last_reading < (target_temperature + offset)
+                logger.debug("TARGET target: {}, current: {}, offset: {}".format(target_temperature, last_reading, offset))
 
             if device not in self.current_state or self.current_state[device]['enabled'] != enabled:
                 app.eventlog.event(eventlog.LEVEL_INFO, self.name, 'behavior:action',

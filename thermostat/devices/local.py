@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Protocols for local devices (e.g. GPIO)."""
 
+import asyncio
+
 import importlib.util
 try:
     importlib.util.find_spec('RPi.GPIO')
@@ -23,6 +25,11 @@ class MemoryOnOffDeviceHandler(BaseDeviceHandler):
     def __init__(self, device_id, device_type, protocol, address, name):
         BaseDeviceHandler.__init__(self, device_id, device_type, protocol, address, name)
         self.enabled = False
+
+    def startup(self):
+        BaseDeviceHandler.startup(self)
+        # initial state
+        asyncio.ensure_future(self.publish_state({'enabled': self.enabled}))
 
     async def control(self, data):
         self.enabled = 'enabled' in data and data['enabled']

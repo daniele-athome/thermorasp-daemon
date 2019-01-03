@@ -4,7 +4,7 @@
 import datetime
 import asyncio
 import os
-from random import randint
+from random import randint, random
 import urllib.parse as urllib_parse
 
 import importlib.util
@@ -73,7 +73,7 @@ class RandomSensorHandler(BaseSensorHandler):
 
     async def timeout(self):
         if self.type == 'temperature':
-            temp = randint(-10, 40)
+            temp = round(randint(10, 30) + random(), 1)
             if self.last_temperature is None or self.last_temperature != temp:
                 self.last_temperature = temp
                 await self.publish({
