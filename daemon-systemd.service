@@ -4,10 +4,10 @@ After=network.target
 
 [Service]
 Type=notify
-ExecStart=/usr/local/bin/thermostatd -d --host 0.0.0.0
+ExecStart=/usr/local/bin/thermostatd
 Restart=no
-User=pi
-Group=pi
+User=@@MAINUSER@@
+Group=@@MAINUSER@@
 
 [Install]
 WantedBy=multi-user.target

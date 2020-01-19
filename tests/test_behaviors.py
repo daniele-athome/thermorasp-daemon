@@ -1,369 +1,147 @@
 # -*- coding: utf-8 -*-
 
+import asyncio
 import unittest
+import json
 
-from freezegun import freeze_time
+from datetime import datetime
 
-from thermostat.models import eventlog
-from thermostat.devices import get_device_handler
-from thermostat.behaviors import BehaviorContext
-from thermostat.behaviors.chrono import *
+from hbmqtt.mqtt.constants import QOS_0
+
+from thermostat.behaviors.generic import TargetTemperatureBehavior
+
+from . import BaseTest
 
 
-class WeeklyHeatingBehaviorTest(unittest.TestCase):
+class TargetTemperatureBehaviorTest(BaseTest, unittest.TestCase):
 
-    @staticmethod
-    def dummy_event_log(level, source, name, description=None):
-        print("EVENT: {}/{}: {} - {}".format(level, source, name, description))
+    sensors = [
+        'homeassistant/thermorasp/sensor/temp_core'
+    ]
+    devices = [
+        'homeassistant/thermorasp/device/home_boiler'
+    ]
 
-    def setUp(self):
-        eventlog.event = self.dummy_event_log
+    def testHeating(self):
+        @asyncio.coroutine
+        def test_coro():
+            try:
+                broker = yield from self.startBroker()
+                client = yield from self.startClient()
 
-        self.context = BehaviorContext({
-            'home_boiler': get_device_handler('home_boiler', 'boiler_on_off', 'local', 'MEMSW:', 'Test Boiler')
-        }, {
-            'temperature': {
-                '_avg': {
-                    'unit': 'celsius',
-                    'value': 18,
-                },
-            },
-        })
-        self.behavior = WeeklyProgramBehavior(1, {
-            'target_device_id': 'home_boiler',
-            'mode': 'heating',
-            'day0': [
-                {
-                    'time_start': '06:00',
-                    'target_temperature': 23,
-                },
-                {
-                    'time_start': '08:00',
-                    'target_temperature': 10,
-                },
-                {
-                    'time_start': '18:00',
-                    'target_temperature': 23,
-                },
-                {
-                    'time_start': '23:00',
-                    'target_temperature': 20,
-                },
-            ],
-            'day1': [
-                {
-                    'time_start': '05:00',
-                    'target_temperature': 25,
-                },
-                {
-                    'time_start': '09:00',
-                    'target_temperature': 5,
-                },
-                {
-                    'time_start': '17:00',
-                    'target_temperature': 27,
-                },
-                {
-                    'time_start': '18:00',
-                    'target_temperature': 34,
-                },
-            ],
-            'day2': [
-                {
-                    'time_start': '06:00',
-                    'target_temperature': 23,
-                },
-                {
-                    'time_start': '08:00',
-                    'target_temperature': 10,
-                },
-                {
-                    'time_start': '18:00',
-                    'target_temperature': 23,
-                },
-                {
-                    'time_start': '23:00',
-                    'target_temperature': 20,
-                },
-            ],
-            'day3': [
-                {
-                    'time_start': '06:00',
-                    'target_temperature': 23,
-                },
-                {
-                    'time_start': '08:00',
-                    'target_temperature': 10,
-                },
-                {
-                    'time_start': '18:00',
-                    'target_temperature': 23,
-                },
-                {
-                    'time_start': '23:00',
-                    'target_temperature': 20,
-                },
-            ],
-            'day4': [
-                {
-                    'time_start': '03:00',
-                    'target_temperature': 28,
-                },
-                {
-                    'time_start': '08:00',
-                    'target_temperature': 10,
-                },
-                {
-                    'time_start': '23:00',
-                    'target_temperature': 21,
-                },
-                {
-                    'time_start': '23:30',
-                    'target_temperature': 17,
-                },
-            ],
-            'day5': [
-                {
-                    'time_start': '06:00',
-                    'target_temperature': 23,
-                },
-                {
-                    'time_start': '08:00',
-                    'target_temperature': 10,
-                },
-                {
-                    'time_start': '18:00',
-                    'target_temperature': 23,
-                },
-                {
-                    'time_start': '23:00',
-                    'target_temperature': 20,
-                },
-            ],
-            'day6': [
-                {
-                    'time_start': '00:00',
-                    'target_temperature': 11,
-                },
-            ],
-        })
+                behavior = TargetTemperatureBehavior(0, 'generic.TargetTemperature', self.sensors, self.devices, client)
 
-    def assertDeviceOn(self):
-        status = self.context.devices['home_boiler'].status()
-        self.assertTrue(status['enabled'])
+                # subscribe for the behavior
+                yield from client.subscribe([(topic + '/+', QOS_0) for topic in self.sensors + self.devices])
+                yield from behavior.startup({'target_temperature': 25, 'mode': 'heating'})
 
-    def assertDeviceOff(self):
-        status = self.context.devices['home_boiler'].status()
-        self.assertFalse(status['enabled'])
+                yield from self._testTargetTemperature(behavior, client, 20, True)
+                yield from self._testTargetTemperature(behavior, client, 10, None)
+                yield from self._testTargetTemperature(behavior, client, 30, False)
+                yield from self._testTargetTemperature(behavior, client, 18, True)
+                yield from self._testTargetTemperature(behavior, client, 25.5, False)
+                yield from self._testTargetTemperature(behavior, client, 25, None)
+                # test continuous increment
+                yield from self._testTargetTemperature(behavior, client, 24, True)
+                yield from self._testTargetTemperature(behavior, client, 24.5, None)
+                yield from self._testTargetTemperature(behavior, client, 25, None)
+                yield from self._testTargetTemperature(behavior, client, 25.5, False)
+                yield from self._testTargetTemperature(behavior, client, 25, None)
+                yield from self._testTargetTemperature(behavior, client, 24, True)
+                yield from self._testTargetTemperature(behavior, client, 24, None)
+                yield from self._testTargetTemperature(behavior, client, 24.5, None)
+                yield from self._testTargetTemperature(behavior, client, 25, None)
+                yield from self._testTargetTemperature(behavior, client, 25.5, False)
+                yield from self._testTargetTemperature(behavior, client, 25, None)
+                yield from self._testTargetTemperature(behavior, client, 24, True)
 
-    def testMonday(self):
-        with freeze_time('2018-02-05 00:10:30'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-05 06:30:45'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-05 12:15:32'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-05 17:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-05 18:00:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-05 18:40:43'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-05 20:35:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-05 22:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-05 23:05:23'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
+                yield from behavior.update({'target_temperature': 24, 'mode': 'heating'})
+                yield from self._testTargetTemperature(behavior, client, 24, None)
+                yield from self._testTargetTemperature(behavior, client, 24.5, False)
+                yield from self._testTargetTemperature(behavior, client, 24, None)
+                yield from self._testTargetTemperature(behavior, client, 23.5, True)
 
-    def testTuesday(self):
-        with freeze_time('2018-02-06 00:10:30'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-06 06:30:45'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-06 12:15:32'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-06 17:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-06 18:00:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-06 18:40:43'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-06 20:35:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-06 22:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-06 23:05:23'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
+                yield from behavior.update({'target_temperature': 23, 'mode': 'heating'})
+                yield from self._testTargetTemperature(behavior, client, 23, None)
+                yield from self._testTargetTemperature(behavior, client, 23.5, False)
+                yield from self._testTargetTemperature(behavior, client, 24, None)
+                yield from self._testTargetTemperature(behavior, client, 23.5, None)
+                yield from self._testTargetTemperature(behavior, client, 23, None)
+                yield from self._testTargetTemperature(behavior, client, 22.5, True)
 
-    def testWednesday(self):
-        with freeze_time('2018-02-07 00:10:30'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-07 06:30:45'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-07 12:15:32'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-07 17:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-07 18:00:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-07 18:40:43'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-07 20:35:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-07 22:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-07 23:05:23'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
+                yield from client.disconnect()
+                yield from broker.shutdown()
+                future.set_result(True)
 
-    def testThursday(self):
-        with freeze_time('2018-02-08 00:10:30'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-08 06:30:45'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-08 12:15:32'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-08 17:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-08 18:00:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-08 18:40:43'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-08 20:35:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-08 22:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-08 23:05:23'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
+            except Exception as e:
+                future.set_exception(e)
 
-    def testFriday(self):
-        with freeze_time('2018-02-09 00:10:30'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-09 06:30:45'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-09 12:15:32'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-09 17:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-09 18:00:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-09 18:40:43'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-09 20:35:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-09 22:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-09 23:05:23'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-09 23:59:23'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
+        future = asyncio.Future(loop=self.loop)
+        self._testCoro(future, test_coro)
 
-    def testSaturday(self):
-        with freeze_time('2018-02-10 00:10:30'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-10 06:30:45'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-10 12:15:32'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-10 17:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-10 18:00:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-10 18:40:43'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-10 20:35:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-10 22:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-10 23:05:23'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
-        with freeze_time('2018-02-10 23:59:23'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOn()
+    def testCooling(self):
+        @asyncio.coroutine
+        def test_coro():
+            try:
+                broker = yield from self.startBroker()
+                client = yield from self.startClient()
 
-    def testSunday(self):
-        with freeze_time('2018-02-11 00:10:30'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-11 06:30:45'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-11 12:15:32'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-11 17:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-11 18:00:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-11 18:40:43'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-11 20:35:00'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-11 22:59:59'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-11 23:05:23'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
-        with freeze_time('2018-02-11 23:59:23'):
-            self.behavior.execute(self.context)
-            self.assertDeviceOff()
+                behavior = TargetTemperatureBehavior(0, 'generic.TargetTemperature', self.sensors, self.devices, client)
+
+                # subscribe for the behavior
+                yield from client.subscribe([(topic + '/+', QOS_0) for topic in self.sensors + self.devices])
+                yield from behavior.startup({'target_temperature': 18, 'mode': 'cooling'})
+
+                yield from self._testTargetTemperature(behavior, client, 20, True)
+                yield from self._testTargetTemperature(behavior, client, 10, False)
+                yield from self._testTargetTemperature(behavior, client, 30, True)
+                yield from self._testTargetTemperature(behavior, client, 18, False)
+                yield from self._testTargetTemperature(behavior, client, 25.5, True)
+                yield from self._testTargetTemperature(behavior, client, 25, None)
+
+                yield from behavior.shutdown()
+
+                yield from client.disconnect()
+                yield from broker.shutdown()
+                future.set_result(True)
+
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                future.set_exception(e)
+
+        future = asyncio.Future(loop=self.loop)
+        self._testCoro(future, test_coro)
+
+    @asyncio.coroutine
+    def _testTargetTemperature(self, behavior, client, temperature, enabled):
+        # publish test sensor data
+        client_pub = yield from self.startClient()
+        for topic in self.sensors:
+            yield from client_pub.publish(topic + '/temperature', json.dumps({
+                'value': temperature,
+                'unit': 'celsius',
+                'timestamp': datetime.now().isoformat()
+            }).encode(), retain=True)
+        yield from client_pub.disconnect()
+
+        message = yield from client.deliver_message()
+        if any(message.topic.startswith(topic) for topic in self.sensors):
+            yield from behavior.sensor_data(message.topic, json.loads(message.data.decode()))
+        elif any(message.topic.startswith(topic) for topic in self.devices):
+            yield from behavior.device_state(message.topic, json.loads(message.data.decode()))
+        else:
+            self.fail('No sensor or device data received.')
+
+        # behavior should have sent control command
+        try:
+            message = yield from client.deliver_message(1)
+            self.assertEqual(message.topic, self.devices[0] + '/control')
+            payload = json.loads(message.data.decode())
+            self.assertEqual(payload['enabled'], enabled)
+
+            # send the control command to the behavior to simulate device state change
+            yield from behavior.device_state(self.devices[0] + '/state', payload)
+        except asyncio.TimeoutError as e:
+            if enabled is not None:
+                raise e

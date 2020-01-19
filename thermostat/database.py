@@ -14,8 +14,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 
-def init(config):
-    engine = create_engine(config.DATABASE_URL)
+def init(database_url):
+    engine = create_engine(database_url)
     # Session to be used throughout app.
     return sessionmaker(bind=engine)
 

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Protocols for local devices (e.g. GPIO)."""
 
+import asyncio
+
 import importlib.util
 try:
     importlib.util.find_spec('RPi.GPIO')
@@ -8,8 +10,10 @@ try:
 except ImportError:
     from fake_rpi.RPi import GPIO as GPIO
 
+from sanic.log import logger
 
 from . import BaseDeviceHandler
+from .. import app
 from ..models import eventlog
 
 
@@ -23,22 +27,14 @@ class MemoryOnOffDeviceHandler(BaseDeviceHandler):
         self.enabled = False
 
     def startup(self):
-        pass
+        BaseDeviceHandler.startup(self)
+        # initial state
+        asyncio.ensure_future(self.publish_state({'enabled': self.enabled}))
 
-    def shutdown(self):
-        pass
-
-    def control(self, *args, **kwargs):
-        if 'enabled' in kwargs and kwargs['enabled']:
-            self.enabled = True
-        else:
-            self.enabled = False
-
-        eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', 'enabled:%d' % self.enabled)
-        return True
-
-    def status(self, *args, **kwargs):
-        return {'enabled': self.enabled}
+    async def control(self, data):
+        self.enabled = 'enabled' in data and data['enabled']
+        app.eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', 'enabled:%d' % self.enabled)
+        await self.publish_state({'enabled': self.enabled})
 
 
 class GPIOSwitchDeviceHandler(BaseDeviceHandler):
@@ -58,19 +54,18 @@ class GPIOSwitchDeviceHandler(BaseDeviceHandler):
         self.enabled = enabled
 
     def startup(self):
+        BaseDeviceHandler.startup(self)
         self.set_switch(False)
 
     def shutdown(self):
+        BaseDeviceHandler.shutdown(self)
         self.set_switch(False)
 
-    def control(self, *args, **kwargs):
-        enabled = 'enabled' in kwargs and kwargs['enabled']
+    async def control(self, data):
+        enabled = 'enabled' in data and data['enabled']
         self.set_switch(enabled)
-        eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', 'enabled:%d' % enabled)
-        return True
-
-    def status(self, *args, **kwargs):
-        return {'enabled': self.enabled}
+        app.eventlog.event(eventlog.LEVEL_INFO, self.get_name(), 'device:control', 'enabled:%d' % enabled)
+        await self.publish_state({'enabled': self.enabled})
 
 
 class GPIO2SwitchDeviceHandler(GPIOSwitchDeviceHandler):
@@ -85,6 +80,7 @@ class GPIO2SwitchDeviceHandler(GPIOSwitchDeviceHandler):
         self.set_switch(False)
 
     def set_switch(self, enabled):
+        logger.info("Setting device {} to state: {}".format(self.get_name(), enabled))
         GPIO.setmode(GPIO.BCM)
         if enabled:
             GPIO.setup(self.pin, GPIO.OUT)

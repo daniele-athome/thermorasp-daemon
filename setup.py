@@ -23,7 +23,7 @@ setup(
     author='Daniele Ricci',
     author_email='daniele@casaricci.it',
     packages=packages,
-    url='https://github.com/daniele-athome/thermostat-daemon',
+    url='https://github.com/daniele-athome/thermorasp-daemon',
     license='LICENSE.txt',
     description='HTTP API and backend daemon for Raspberry PI Smart Thermostat',
     long_description=long_description,

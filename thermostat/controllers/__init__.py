@@ -8,7 +8,7 @@ from .. import app, errors
 
 
 # noinspection PyUnusedLocal
-@app.route('/')
+@app.route('/', methods=['GET', 'OPTIONS'])
 async def index(request: Request):
     """Root page with greeting text."""
     return html('<!DOCTYPE html><html><head><title>Smart Thermostat</title></head>'
@@ -34,4 +34,4 @@ def no_content(status=204, headers=None):
 
 
 # import other controllers
-from . import sensors, devices, pipelines, behaviors, eventlog
+from . import sensors, devices, schedules, behaviors, eventlog

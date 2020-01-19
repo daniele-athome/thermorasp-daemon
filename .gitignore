@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 
 # Distribution / packaging
+venv
 build/
 dist/
 *.egg-info/

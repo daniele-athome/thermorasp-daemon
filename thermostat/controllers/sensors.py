@@ -6,12 +6,10 @@ import datetime
 from sanic.request import Request
 from sanic.response import json
 
-from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy.sql.expression import desc
-
 from .. import app, errors
 from ..database import scoped_session
-from ..models.sensors import Sensor, Reading, get_last_readings, is_active_sensor
+from ..models.sensors import Reading
+
 
 SENSOR_STATUS_MAP = (
     'unknown',
@@ -20,30 +18,35 @@ SENSOR_STATUS_MAP = (
     'inactive',
 )
 
-SENSOR_DATA_MODE_MAP = (
-    'active',
-    'passive',
-)
-
 
 def serialize_sensor(sensor):
     return {
         'id': sensor.id,
-        'type': sensor.sensor_type,
-        'data_mode': SENSOR_DATA_MODE_MAP[sensor.data_mode],
+        'type': sensor.type,
         'protocol': sensor.protocol,
         'address': sensor.address,
-        'status': SENSOR_STATUS_MAP[sensor.status]
+        'icon': sensor.icon,
+        'topic': sensor.topic,
     }
 
 
-def serialize_sensor_reading(mreading):
+def serialize_sensor_reading(sensor_id, mreading):
+    return {
+        'sensor_id': sensor_id,
+        'type': mreading['type'],
+        'timestamp': mreading['timestamp'].isoformat(),
+        'unit': mreading['unit'],
+        'value': mreading['value'],
+    }
+
+
+def serialize_sensor_reading_db(mreading: Reading):
     return {
         'sensor_id': mreading.sensor_id,
         'type': mreading.sensor_type,
         'timestamp': mreading.timestamp.isoformat(),
         'unit': mreading.unit,
-        'value': mreading.value,
+        'value': float(mreading.value),
     }
 
 
@@ -52,10 +55,15 @@ def serialize_sensor_reading(mreading):
 async def index(request: Request):
     """List all registered sensors."""
 
-    with scoped_session(app.database) as session:
-        stmt = Sensor.__table__.select()
-        sensors = [serialize_sensor(s) for s in session.execute(stmt)]
-    return json(sensors)
+    return json([serialize_sensor(d) for d in app.backend.sensors.values()])
+
+
+# noinspection PyUnusedLocal
+@app.get('/sensors/topic/<sensor_id>')
+async def topic(request: Request, sensor_id: str):
+    """Get the base topic for a given sensor."""
+
+    return json(app.backend.sensors[sensor_id].topic)
 
 
 @app.post('/sensors/register')
@@ -65,16 +73,8 @@ async def register(request: Request):
     """
 
     in_data = request.json
-    with scoped_session(app.database) as session:
-        sensor = Sensor()
-        sensor.id = in_data['id']
-        sensor.sensor_type = in_data['type']
-        sensor.data_mode = SENSOR_DATA_MODE_MAP.index(in_data['data_mode'])
-        sensor.protocol = in_data['protocol']
-        sensor.address = in_data['address']
-        sensor.status = Sensor.STATUS_UNKNOWN
-        sensor = session.merge(sensor)
-        return json(serialize_sensor(sensor), 201)
+    app.backend.sensors.register(in_data['id'], in_data['protocol'], in_data['address'], in_data['type'], in_data['icon'])
+    return json({'id': in_data['id']}, 201)
 
 
 @app.post('/sensors/unregister')
@@ -84,16 +84,10 @@ async def unregister(request: Request):
     """
 
     in_data = request.json
-    with scoped_session(app.database) as session:
-        try:
-            sensor = session.query(Sensor).filter(Sensor.id == in_data['id']).one()
-            session.delete(sensor)
-            return json({
-                'id': sensor.id,
-                'status': 'unregistered',
-            })
-        except NoResultFound:
-            raise errors.NotFoundError('Sensor not found.')
+    if app.backend.sensors.unregister(in_data['id']):
+        return json({'id': in_data['id']})
+    else:
+        raise errors.NotFoundError('Sensor not found.')
 
 
 # noinspection PyUnusedLocal
@@ -106,8 +100,8 @@ async def reading(request: Request):
     else:
         sensor_type = None
 
-    with scoped_session(app.database) as session:
-        return json([serialize_sensor_reading(latest) for latest in get_last_readings(session, sensor_type=sensor_type)])
+    readings = app.backend.sensors.get_last_readings(sensor_type=sensor_type)
+    return json([serialize_sensor_reading(sensor_id, latest) for sensor_id, latest in readings.items()])
 
 
 # noinspection PyUnusedLocal
@@ -115,29 +109,32 @@ async def reading(request: Request):
 async def reading(request: Request, sensor_id: str):
     """Reads the latest sensor reading from the database."""
 
+    r = app.backend.sensors.get_last_reading(sensor_id)
+    if r:
+        return json(serialize_sensor_reading(sensor_id, r))
+    else:
+        return json({})
+
+
+@app.get('/sensors/readings')
+async def reading_list(request: Request):
+    """Reads sensor readings from the database."""
+
+    if 'sensor_type' in request.args:
+        sensor_type = request.args['sensor_type'][0]
+    else:
+        sensor_type = None
+
+    date_from = datetime.datetime.strptime(request.args['from'][0], '%Y-%m-%dT%H:%M:%S')
+    date_to = datetime.datetime.strptime(request.args['to'][0], '%Y-%m-%dT%H:%M:%S')
+
     with scoped_session(app.database) as session:
-        latest = session.query(Reading).filter(Reading.sensor_id == sensor_id)\
-            .order_by(desc(Reading.timestamp)).limit(1).one()
-        return json(serialize_sensor_reading(latest))
+        query = session.query(Reading)
+        if sensor_type:
+            query = query.filter(Reading.sensor_type == sensor_type)
 
+        readings = query.filter(Reading.timestamp.between(date_from, date_to)) \
+                        .order_by(Reading.timestamp) \
+                        .all()
 
-@app.post('/sensors/reading')
-async def reading(request: Request):
-    """Adds a sensor reading to the database. Used by sensors to send data."""
-
-    in_data = request.json
-    with scoped_session(app.database) as session:
-        if is_active_sensor(session, in_data['sensor_id']):
-            mreading = Reading()
-            mreading.sensor_id = in_data['sensor_id']
-            mreading.sensor_type = in_data['type']
-            mreading.unit = in_data['unit']
-            mreading.value = in_data['value']
-            if 'timestamp' in in_data:
-                mreading.timestamp = in_data['timestamp']
-            else:
-                mreading.timestamp = datetime.datetime.now()
-            session.add(mreading)
-            return json(serialize_sensor_reading(mreading))
-        else:
-            raise errors.NotFoundError('Sensor not found.')
+        return json([serialize_sensor_reading_db(r) for r in readings])

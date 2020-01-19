@@ -1,6 +1,8 @@
-sanic==0.7.0
+sanic==0.8.3
 SQLAlchemy==1.2.1
 alembic==0.9.7
 w1thermsensor==1.0.5
 sdnotify==0.3.2
-requests==2.18.4
+requests==2.20.1
+hbmqtt==0.9.5
+python-dateutil==2.7.5
