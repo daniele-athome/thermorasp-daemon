@@ -131,7 +131,7 @@ class OperatingSchedule(object):
                 self.behavior = behavior
                 self.behavior_sub = asyncio.ensure_future(self.subscribe_for_behavior(behavior))
                 # publish active behavior
-                self.broker.publish(self.behavior_topic, json.dumps(self.behavior_def).encode(), retain=True)
+                await self.broker.publish(self.behavior_topic, json.dumps(self.behavior_def).encode(), retain=True)
             except SelfDestructError:
                 logger.debug("Behavior self-destructed during startup")
                 self.delete_behavior(behavior_def)
@@ -164,7 +164,7 @@ class OperatingSchedule(object):
                 self.delete_behavior(self.behavior_def)
 
             # publish null behavior
-            self.broker.publish(self.behavior_topic, None, retain=True)
+            await self.broker.publish(self.behavior_topic, None, retain=True)
             self.behavior = None
             self.behavior_def = None
             self.behavior_sub = None
