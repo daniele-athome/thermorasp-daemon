@@ -29,6 +29,7 @@ class OperatingSchedule(object):
         self.behavior_def = None
         # the currently operating behavior subscription task
         self.behavior_sub = None
+        self.behavior_topic = app.new_topic('behavior/active')
         self.broker = mqtt_client.MQTTClient(config={'auto_reconnect': False})
         self.is_running = False
 
@@ -129,6 +130,8 @@ class OperatingSchedule(object):
                 self.behavior_def = behavior_def
                 self.behavior = behavior
                 self.behavior_sub = asyncio.ensure_future(self.subscribe_for_behavior(behavior))
+                # publish active behavior
+                self.broker.publish(self.behavior_topic, json.dumps(self.behavior_def).encode(), retain=True)
             except SelfDestructError:
                 logger.debug("Behavior self-destructed during startup")
                 self.delete_behavior(behavior_def)
@@ -159,6 +162,9 @@ class OperatingSchedule(object):
             except SelfDestructError:
                 logger.debug("Behavior self-destructed during shutdown")
                 self.delete_behavior(self.behavior_def)
+
+            # publish null behavior
+            self.broker.publish(self.behavior_topic, None, retain=True)
             self.behavior = None
             self.behavior_def = None
             self.behavior_sub = None
