@@ -164,7 +164,7 @@ class OperatingSchedule(object):
                 self.delete_behavior(self.behavior_def)
 
             # publish null behavior
-            await self.broker.publish(self.behavior_topic, None, retain=True)
+            await self.broker.publish(self.behavior_topic, '', retain=True)
             self.behavior = None
             self.behavior_def = None
             self.behavior_sub = None
