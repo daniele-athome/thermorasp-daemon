@@ -1,4 +1,4 @@
-sanic==0.8.3
+sanic==20.12.7
 SQLAlchemy==1.2.1
 alembic==0.9.7
 w1thermsensor==1.0.5
